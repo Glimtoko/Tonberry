@@ -277,3 +277,21 @@ void Mesh2D::dumpToNetCDF_NG() {
     WRITENG(EVar, this->E);
 }
 
+QUANT_2D &Mesh2D::getMomentum(Sweep sweep, Direction direction) {
+    switch (sweep) {
+        case Sweep::x:
+            switch (direction) {
+                case normal:
+                    return momU;
+                default:
+                    return momV;
+            }
+        default:
+            switch (direction) {
+                case normal:
+                    return momV;
+                default:
+                    return momU;
+            }
+    }
+}

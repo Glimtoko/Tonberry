@@ -69,23 +69,39 @@ double getTimestep(Mesh2D mesh) {
 
 // momU is always momentum in sweep direction, momV is tangential
 void sweep(
-    QUANT_2D &rho, QUANT_2D &momU, QUANT_2D &momV, QUANT_2D &E,
-    int ni, int nj, int iUpper, int jUpper,
+    Mesh2D &mesh,
+//     int ni, int nj, int iUpper, int jUpper,
     Sweep sweep,
-    double dx, double omega, double dt, double gamma)
+    double dt)
 {
 
+    QUANT_2D &rho = mesh.rho;
+    QUANT_2D &E = mesh.E;
+    QUANT_2D &momU = mesh.getMomentum(sweep, Direction::normal);
+    QUANT_2D &momV = mesh.getMomentum(sweep, Direction::tangential);
+
     int di, dj;
+    double dx;
     switch (sweep) {
         case x:
             di = 1;
             dj = 0;
+            dx = mesh.dx;
             break;
         case y:
             di = 0;
             dj = 1;
+            dx = mesh.dy;
             break;
     }
+
+    int ni = mesh.niGhosts;
+    int nj = mesh.njGhosts;
+    int iUpper = mesh.iUpper;
+    int jUpper = mesh.jUpper;
+
+    double omega = 0.0;
+    double gamma = mesh.gamma;
 
     Mesh2D meshLD = Mesh2D(ni, nj, 0.0);
     Mesh2D meshRU = Mesh2D(ni, nj, 0.0);
@@ -195,4 +211,7 @@ void sweep(
             E[j][i] += f*(flux[j-dj][i-di].E - flux[j][i].E);
         }
     }
+
+    // Boundary update
+    mesh.setBoundaries();
 }

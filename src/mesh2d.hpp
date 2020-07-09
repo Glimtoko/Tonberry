@@ -1,5 +1,7 @@
 #ifndef MESH2D_H
 #define MESH2D_H
+#include "sweep.hpp"
+
 #include <vector>
 
 typedef std::vector<double> QUANT_1D;
@@ -32,5 +34,7 @@ public:
     void setBoundaries();
     void dumpToNetCDF();
     void dumpToNetCDF_NG();
+
+    QUANT_2D &getMomentum(Sweep, Direction);
 };
 #endif
