@@ -23,9 +23,11 @@ int main() {
         std::cout << ", dt = " << dt << std::endl;
 
         // Sweep is half X, then Y, then half X
-        sweep(mesh, Sweep::x, dt/2.0);
-        sweep(mesh, Sweep::y, dt);
-        sweep(mesh, Sweep::x, dt/2.0);
+//         sweep(mesh, Sweep::x, dt/2.0);
+        sweepX(mesh, dt/2.0);
+        sweepY(mesh, dt);
+//         sweep(mesh, Sweep::x, dt/2.0);
+        sweepX(mesh, dt/2.0);
 
         t += dt;
         if (t > 0.25 || step > 2000) break;

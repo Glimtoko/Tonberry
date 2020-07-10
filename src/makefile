@@ -26,7 +26,6 @@ main.o: mesh2d.o flux.o update.o
 update.o: flux.o
 
 
-
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CFLAGS) $(INC)
 

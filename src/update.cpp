@@ -4,7 +4,7 @@
 #include <math.h>
 #include <iostream>
 
-double getLimiter(double di1, double di2, double omega) {
+double getLimiter1D(double di1, double di2, double omega) {
     double xi;
     // Slope limiter - Van Leer
     if (di2 == 0) {
@@ -21,30 +21,155 @@ double getLimiter(double di1, double di2, double omega) {
     return xi;
 }
 
-double getSlope(QUANT_2D U, int i, int j, int ud, int lr, double omega) {
-    double di1 = U[j][i] - U[j-ud][i-lr];
-    double di2 = U[j+ud][i+lr] - U[j][i];
+double getSlope1D(QUANT_1D U, int i, double omega) {
+    double di1 = U[i] - U[i-1];
+    double di2 = U[i+1] - U[i];
 
     double diU = 0.5*(1.0 + omega)*di1 + 0.5*(1.0 - omega)*di2;
 
-    diU *= getLimiter(di1, di2, omega);
+    diU *= getLimiter1D(di1, di2, omega);
 
     return diU;
 }
 
 
-inline double calc_flux_rho(double rho, double u) {
+inline double calcFluxRho(double rho, double u) {
     return rho*u;
 }
 
 
-inline double calc_flux_mom(double rho, double u, double v, double p) {
+inline double calcFluxMom(double rho, double u, double v, double p) {
     return rho*u*v + p;
 }
 
 
-inline double calc_flux_E(double u, double E, double p) {
+inline double calcFluxE(double u, double E, double p) {
     return u*(E + p);
+}
+
+
+void sweep1D(
+    QUANT_1D &rho, QUANT_1D &E, QUANT_1D &momN, QUANT_1D &momT,
+    int ni, int iUpper, double gamma, double dt, double dx)
+{
+    double omega = 0.0;
+
+    QUANT_1D rhoL;
+    QUANT_1D rhoR;
+    QUANT_1D momTL;
+    QUANT_1D momTR;
+    QUANT_1D momNL;
+    QUANT_1D momNR;
+    QUANT_1D EL;
+    QUANT_1D ER;
+
+    rhoL.assign(ni, 0.0);
+    rhoR.assign(ni, 0.0);
+    momTL.assign(ni, 0.0);
+    momTR.assign(ni, 0.0);
+    momNL.assign(ni, 0.0);
+    momNR.assign(ni, 0.0);
+    EL.assign(ni, 0.0);
+    ER.assign(ni, 0.0);
+
+    std::vector<Flux::Flux> flux;
+    flux.resize(ni);
+
+    // Data reconstruction
+    for (int i=1; i<iUpper+1; i++) {
+        double dRho = 0.5*getSlope1D(rho, i, omega);
+        rhoL[i] = rho[i] - dRho;
+        rhoR[i] = rho[i] + dRho;
+
+        double dMomU = 0.5*getSlope1D(momN, i, omega);
+        momNL[i] = momN[i] - dMomU;
+        momNR[i] = momN[i] + dMomU;
+
+        double dMomV = 0.5*getSlope1D(momT, i, omega);
+        momTL[i] = momT[i] - dMomV;
+        momTR[i] = momT[i] + dMomV;
+
+        double dE = 0.5*getSlope1D(E, i, omega);
+        EL[i] = E[i] - dE;
+        ER[i] = E[i] + dE;
+    }
+
+
+
+    // Data evolution to half timestep
+    double f = 0.5*dt/dx;
+    for (int i=1; i<iUpper+1; i++) {
+        double uLD = momNL[i]/rhoL[i];
+        double uRU = momNR[i]/rhoR[i];
+
+        double vLD = momTL[i]/rhoL[i];
+        double vRU = momTR[i]/rhoR[i];
+
+        double pLD = (gamma - 1.0)*(
+            EL[i] - 0.5*rhoL[i]*uLD*uLD
+                        - 0.5*rhoL[i]*vLD*vLD
+        );
+
+        double pRU = (gamma - 1.0)*(
+            ER[i] - 0.5*rhoR[i]*uRU*uRU
+                        - 0.5*rhoR[i]*vRU*vRU
+        );
+
+        double dF_rho = f*(calcFluxRho(rhoL[i], uLD) -
+                            calcFluxRho(rhoR[i], uRU));
+
+        double dF_momN = f*(calcFluxMom(rhoL[i], uLD, uLD, pLD) -
+                            calcFluxMom(rhoR[i], uRU, uRU, pRU));
+
+        double dF_momT = f*(calcFluxMom(rhoL[i], uLD, vLD, 0.0) -
+                            calcFluxMom(rhoR[i], uRU, vRU, 0.0));
+
+        double dF_E = f*(calcFluxE(uLD, EL[i], pLD) -
+                            calcFluxE(uRU, ER[i], pRU));
+
+        rhoL[i] += dF_rho;
+        rhoR[i] += dF_rho;
+        momNL[i] += dF_momN;
+        momNR[i] += dF_momN;
+        momTL[i] += dF_momT;
+        momTR[i] += dF_momT;
+        EL[i] += dF_E;
+        ER[i] += dF_E;
+    }
+
+    // Get intercell fluxes from Riemann solver
+    for (int i=1; i<iUpper+1; i++) {
+        double rhoLD_cell = rhoR[i];
+        double uLD_cell = momNR[i]/rhoR[i];
+        double vLD_cell = momTR[i]/rhoR[i];
+        double pLD_cell = (gamma - 1.0)*(
+            ER[i] - 0.5*rhoR[i]*uLD_cell*uLD_cell
+                            - 0.5*rhoR[i]*vLD_cell*vLD_cell
+        );
+
+        double rhoRU_cell = rhoR[i+1];
+        double uRU_cell = momNR[i+1]/rhoR[i+1];
+        double vRU_cell = momTR[i+1]/rhoR[i+1];
+        double pRU_cell = (gamma - 1.0)*(
+            EL[i+1] - 0.5*rhoL[i+1]*uRU_cell*uRU_cell
+                                    - 0.5*rhoL[i+1]*vRU_cell*vRU_cell
+        );
+
+        flux[i] = Flux::getFluxHLLC(
+            uLD_cell, vLD_cell, rhoLD_cell, pLD_cell,
+            uRU_cell, vRU_cell, rhoRU_cell, pRU_cell,
+            gamma);
+
+    }
+
+    // Update
+    f = dt/dx;
+    for (int i=2; i<iUpper; i++) {
+        rho[i] += f*(flux[i-1].rho - flux[i].rho);
+        momN[i] += f*(flux[i-1].momU - flux[i].momU);
+        momT[i] += f*(flux[i-1].momV - flux[i].momV);
+        E[i] += f*(flux[i-1].E - flux[i].E);
+    }
 }
 
 
@@ -67,148 +192,82 @@ double getTimestep(Mesh2D mesh) {
 }
 
 
-// momU is always momentum in sweep direction, momV is tangential
-void sweep(
-    Mesh2D &mesh,
-//     int ni, int nj, int iUpper, int jUpper,
-    Sweep sweep,
-    double dt)
-{
+void sweepX(Mesh2D &mesh, double dt) {
+    int ni = mesh.niGhosts;
+    int iUpper = mesh.iUpper;
+    int jUpper = mesh.jUpper;
+    double gamma = mesh.gamma;
+    double dx = mesh.dx;
 
-    QUANT_2D &rho = mesh.rho;
-    QUANT_2D &E = mesh.E;
-    QUANT_2D &momU = mesh.getMomentum(sweep, Direction::normal);
-    QUANT_2D &momV = mesh.getMomentum(sweep, Direction::tangential);
+    QUANT_1D rho;
+    QUANT_1D momN;
+    QUANT_1D momT;
+    QUANT_1D E;
 
-    int di, dj;
-    double dx;
-    switch (sweep) {
-        case x:
-            di = 1;
-            dj = 0;
-            dx = mesh.dx;
-            break;
-        case y:
-            di = 0;
-            dj = 1;
-            dx = mesh.dy;
-            break;
+    rho.assign(ni, 0.0);
+    momN.assign(ni, 0.0);
+    momT.assign(ni, 0.0);
+    E.assign(ni, 0.0);
+
+    for (int j=2; j<jUpper; j++) {
+        // Pack 1D data
+        for (int i=0; i<ni; i++) {
+            rho[i] = mesh.rho[j][i];
+            momN[i] = mesh.momU[j][i];
+            momT[i] = mesh.momV[j][i];
+            E[i] = mesh.E[j][i];
+        }
+        // Sweep
+        sweep1D(rho, E, momN, momT, ni, iUpper, gamma, dt, dx);
+
+        // Unpack 1D data
+        for (int i=0; i<ni; i++) {
+            mesh.rho[j][i] = rho[i];
+            mesh.momU[j][i] = momN[i];
+            mesh.momV[j][i] = momT[i];
+            mesh.E[j][i] = E[i];
+        }
     }
 
-    int ni = mesh.niGhosts;
+    // Boundary update
+    mesh.setBoundaries();
+}
+
+
+void sweepY(Mesh2D &mesh, double dt) {
     int nj = mesh.njGhosts;
     int iUpper = mesh.iUpper;
     int jUpper = mesh.jUpper;
-
-    double omega = 0.0;
     double gamma = mesh.gamma;
+    double dy = mesh.dy;
 
-    Mesh2D meshLD = Mesh2D(ni, nj, 0.0);
-    Mesh2D meshRU = Mesh2D(ni, nj, 0.0);
+    QUANT_1D rho;
+    QUANT_1D momN;
+    QUANT_1D momT;
+    QUANT_1D E;
 
-    std::vector<std::vector<Flux::Flux>> flux;
-    flux.resize(nj, std::vector<Flux::Flux>(ni));
+    rho.assign(nj, 0.0);
+    momN.assign(nj, 0.0);
+    momT.assign(nj, 0.0);
+    E.assign(nj, 0.0);
 
-    // Data reconstruction
-    for (int j=1; j<jUpper+1; j++) {
-        for (int i=1; i<iUpper+1; i++) {
-            double dRho = 0.5*getSlope(rho, i, j, dj, di, omega);
-            meshLD.rho[j][i] = rho[j][i] - dRho;
-            meshRU.rho[j][i] = rho[j][i] + dRho;
-
-            double dMomU = 0.5*getSlope(momU, i, j, dj, di, omega);
-            meshLD.momU[j][i] = momU[j][i] - dMomU;
-            meshRU.momU[j][i] = momU[j][i] + dMomU;
-
-            double dMomV = 0.5*getSlope(momV, i, j, dj, di, omega);
-            meshLD.momV[j][i] = momV[j][i] - dMomV;
-            meshRU.momV[j][i] = momV[j][i] + dMomV;
-
-            double dE = 0.5*getSlope(E, i, j, dj, di, omega);
-            meshLD.E[j][i] = E[j][i] - dE;
-            meshRU.E[j][i] = E[j][i] + dE;
+    for (int i=2; i<iUpper; i++) {
+        // Pack 1D data
+        for (int j=0; j<nj; j++) {
+            rho[j] = mesh.rho[j][i];
+            momN[j] = mesh.momV[j][i];
+            momT[j] = mesh.momU[j][i];
+            E[j] = mesh.E[j][i];
         }
-    }
+        // Sweep
+        sweep1D(rho, E, momN, momT, nj, jUpper, gamma, dt, dy);
 
-
-    // Data evolution to half timestep
-    double f = 0.5*dt/dx;
-    for (int j=1; j<jUpper+1; j++) {
-        for (int i=1; i<iUpper+1; i++) {
-            double uLD = meshLD.momU[j][i]/meshLD.rho[j][i];
-            double uRU = meshRU.momU[j][i]/meshRU.rho[j][i];
-
-            double vLD = meshLD.momV[j][i]/meshLD.rho[j][i];
-            double vRU = meshRU.momV[j][i]/meshRU.rho[j][i];
-
-            double pLD = (gamma - 1.0)*(
-                meshLD.E[j][i] - 0.5*meshLD.rho[j][i]*uLD*uLD
-                            - 0.5*meshLD.rho[j][i]*vLD*vLD
-            );
-
-            double pRU = (gamma - 1.0)*(
-                meshRU.E[j][i] - 0.5*meshRU.rho[j][i]*uRU*uRU
-                            - 0.5*meshRU.rho[j][i]*vRU*vRU
-            );
-
-            double dF_rho = f*(calc_flux_rho(meshLD.rho[j][i], uLD) -
-                               calc_flux_rho(meshRU.rho[j][i], uRU));
-
-            double dF_momU = f*(calc_flux_mom(meshLD.rho[j][i], uLD, uLD, pLD) -
-                               calc_flux_mom(meshRU.rho[j][i], uRU, uRU, pRU));
-
-            double dF_momV = f*(calc_flux_mom(meshLD.rho[j][i], uLD, vLD, 0.0) -
-                               calc_flux_mom(meshRU.rho[j][i], uRU, vRU, 0.0));
-
-            double dF_E = f*(calc_flux_E(uLD, meshLD.E[j][i], pLD) -
-                             calc_flux_E(uRU, meshRU.E[j][i], pRU));
-
-            meshLD.rho[j][i] += dF_rho;
-            meshRU.rho[j][i] += dF_rho;
-            meshLD.momU[j][i] += dF_momU;
-            meshRU.momU[j][i] += dF_momU;
-            meshLD.momV[j][i] += dF_momV;
-            meshRU.momV[j][i] += dF_momV;
-            meshLD.E[j][i] += dF_E;
-            meshRU.E[j][i] += dF_E;
-        }
-    }
-
-    // Get intercell fluxes from Riemann solver
-    for (int j=1; j<jUpper+1; j++) {
-        for (int i=1; i<iUpper+1; i++) {
-            double rhoLD_cell = meshRU.rho[j][i];
-            double uLD_cell = meshRU.momU[j][i]/meshRU.rho[j][i];
-            double vLD_cell = meshRU.momV[j][i]/meshRU.rho[j][i];
-            double pLD_cell = (gamma - 1.0)*(
-                meshRU.E[j][i] - 0.5*meshRU.rho[j][i]*uLD_cell*uLD_cell
-                               - 0.5*meshRU.rho[j][i]*vLD_cell*vLD_cell
-            );
-
-            double rhoRU_cell = meshRU.rho[j+dj][i+di];
-            double uRU_cell = meshRU.momU[j+dj][i+di]/meshRU.rho[j+dj][i+di];
-            double vRU_cell = meshRU.momV[j+dj][i+di]/meshRU.rho[j+dj][i+di];
-            double pRU_cell = (gamma - 1.0)*(
-                meshLD.E[j+dj][i+di] - 0.5*meshLD.rho[j+dj][i+di]*uRU_cell*uRU_cell
-                                     - 0.5*meshLD.rho[j+dj][i+di]*vRU_cell*vRU_cell
-            );
-
-            flux[j][i] = Flux::getFluxHLLC(
-                uLD_cell, vLD_cell, rhoLD_cell, pLD_cell,
-                uRU_cell, vRU_cell, rhoRU_cell, pRU_cell,
-                gamma);
-
-        }
-    }
-
-    // Update
-    f = dt/dx;
-    for (int j=2; j<jUpper; j++) {
-        for (int i=2; i<iUpper; i++) {
-            rho[j][i] += f*(flux[j-dj][i-di].rho - flux[j][i].rho);
-            momU[j][i] += f*(flux[j-dj][i-di].momU - flux[j][i].momU);
-            momV[j][i] += f*(flux[j-dj][i-di].momV - flux[j][i].momV);
-            E[j][i] += f*(flux[j-dj][i-di].E - flux[j][i].E);
+        // Unpack 1D data
+        for (int j=0; j<nj; j++) {
+            mesh.rho[j][i] = rho[j];
+            mesh.momV[j][i] = momN[j];
+            mesh.momU[j][i] = momT[j];
+            mesh.E[j][i] = E[j];
         }
     }
 

@@ -1,15 +1,14 @@
-#ifndef UPDATEH
-#define UPDATEH
+#ifndef UPDATENEWH
+#define UPDATENEWH
 #include "mesh2d.hpp"
 #include "sweep.hpp"
 
-// enum Sweep { x, y };
+void sweep1D(
+    QUANT_1D &rho, QUANT_1D &E, QUANT_1D &momN, QUANT_1D &momT,
+    int ni, int iUpper, double gamma, double dt, double dx);
 
 double getTimestep(Mesh2D);
-void sweep(
-//     QUANT_2D &,  QUANT_2D &,  QUANT_2D &,  QUANT_2D &,
-    Mesh2D &,
-//     int, int, int, int,
-    Sweep,
-    double);
+void sweepX(Mesh2D &mesh, double dt);
+void sweepY(Mesh2D &mesh, double dt);
+
 #endif
