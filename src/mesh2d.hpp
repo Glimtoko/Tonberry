@@ -4,8 +4,13 @@
 
 #include <vector>
 
-typedef std::vector<double> QUANT_1D;
-typedef std::vector<std::vector<double> > QUANT_2D;
+// typedef std::vector<double> QUANT_1D;
+// typedef std::vector<std::vector<double> > QUANT_2D;
+
+#define ALLOCATE(matrix, ni, nj) matrix = new double*[nj]; for(size_t i = 0 ; i < nj ; ++i)  matrix[i] = new double[ni];
+
+typedef double* QUANT_1D;
+typedef double** QUANT_2D;
 
 class Mesh2D {
 public:

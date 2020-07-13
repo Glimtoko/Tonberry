@@ -2,12 +2,13 @@
 #include "update.hpp"
 
 #include <iostream>
+#include "mpi.h"
 
 int main() {
 
 
     // 100x100 mesh using spherical Sod set-up
-    Mesh2D mesh(100, 100, 2);
+    Mesh2D mesh(200, 200, 2);
 
     mesh.dumpToNetCDF();
 
@@ -23,10 +24,8 @@ int main() {
         std::cout << ", dt = " << dt << std::endl;
 
         // Sweep is half X, then Y, then half X
-//         sweep(mesh, Sweep::x, dt/2.0);
         sweepX(mesh, dt/2.0);
         sweepY(mesh, dt);
-//         sweep(mesh, Sweep::x, dt/2.0);
         sweepX(mesh, dt/2.0);
 
         t += dt;

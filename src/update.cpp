@@ -54,23 +54,14 @@ void sweep1D(
 {
     double omega = 0.0;
 
-    QUANT_1D rhoL;
-    QUANT_1D rhoR;
-    QUANT_1D momTL;
-    QUANT_1D momTR;
-    QUANT_1D momNL;
-    QUANT_1D momNR;
-    QUANT_1D EL;
-    QUANT_1D ER;
-
-    rhoL.assign(ni, 0.0);
-    rhoR.assign(ni, 0.0);
-    momTL.assign(ni, 0.0);
-    momTR.assign(ni, 0.0);
-    momNL.assign(ni, 0.0);
-    momNR.assign(ni, 0.0);
-    EL.assign(ni, 0.0);
-    ER.assign(ni, 0.0);
+    QUANT_1D rhoL = new double[ni];
+    QUANT_1D rhoR = new double[ni];
+    QUANT_1D momTL = new double[ni];
+    QUANT_1D momTR = new double[ni];
+    QUANT_1D momNL = new double[ni];
+    QUANT_1D momNR = new double[ni];
+    QUANT_1D EL = new double[ni];
+    QUANT_1D ER = new double[ni];
 
     std::vector<Flux::Flux> flux;
     flux.resize(ni);
@@ -170,6 +161,15 @@ void sweep1D(
         momT[i] += f*(flux[i-1].momV - flux[i].momV);
         E[i] += f*(flux[i-1].E - flux[i].E);
     }
+
+    delete[] rhoL;
+    delete[] rhoR;
+    delete[] momTL;
+    delete[] momTR;
+    delete[] momNL;
+    delete[] momNR;
+    delete[] EL;
+    delete[] ER;
 }
 
 
@@ -199,15 +199,10 @@ void sweepX(Mesh2D &mesh, double dt) {
     double gamma = mesh.gamma;
     double dx = mesh.dx;
 
-    QUANT_1D rho;
-    QUANT_1D momN;
-    QUANT_1D momT;
-    QUANT_1D E;
-
-    rho.assign(ni, 0.0);
-    momN.assign(ni, 0.0);
-    momT.assign(ni, 0.0);
-    E.assign(ni, 0.0);
+    QUANT_1D rho = new double[ni];
+    QUANT_1D momN = new double[ni];
+    QUANT_1D momT = new double[ni];
+    QUANT_1D E = new double[ni];
 
     for (int j=2; j<jUpper; j++) {
         // Pack 1D data
@@ -229,6 +224,11 @@ void sweepX(Mesh2D &mesh, double dt) {
         }
     }
 
+    delete[] rho;
+    delete[] momN;
+    delete[] momT;
+    delete[] E;
+
     // Boundary update
     mesh.setBoundaries();
 }
@@ -241,15 +241,10 @@ void sweepY(Mesh2D &mesh, double dt) {
     double gamma = mesh.gamma;
     double dy = mesh.dy;
 
-    QUANT_1D rho;
-    QUANT_1D momN;
-    QUANT_1D momT;
-    QUANT_1D E;
-
-    rho.assign(nj, 0.0);
-    momN.assign(nj, 0.0);
-    momT.assign(nj, 0.0);
-    E.assign(nj, 0.0);
+    QUANT_1D rho = new double[nj];
+    QUANT_1D momN = new double[nj];
+    QUANT_1D momT = new double[nj];
+    QUANT_1D E = new double[nj];
 
     for (int i=2; i<iUpper; i++) {
         // Pack 1D data
@@ -270,6 +265,11 @@ void sweepY(Mesh2D &mesh, double dt) {
             mesh.E[j][i] = E[j];
         }
     }
+
+    delete[] rho;
+    delete[] momN;
+    delete[] momT;
+    delete[] E;
 
     // Boundary update
     mesh.setBoundaries();

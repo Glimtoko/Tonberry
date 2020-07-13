@@ -10,6 +10,8 @@
 
 #define WRITENG(A,B) for (int j=2; j<this->jUpper; j++) {for (int i=2; i<this->jUpper; i++) {test[j-2][i-2] = B[j][i];}} A.putVar(test);
 
+
+
 Mesh2D::Mesh2D(int ni, int nj, double v) {
     // Set X and Y lengths for Sod
     double xLength = 1.0;
@@ -25,7 +27,7 @@ Mesh2D::Mesh2D(int ni, int nj, double v) {
     // be 1D arrays, as, for example, all cells with the same j-index will have
     // the same y position.
     double dx = xLength/ni;
-    x.resize(niGhosts);
+    x = new double(niGhosts);
 
     // Ghost/boundary cells mean that the first "data" cell is at index 2.
     // Coordinates are for cell centres, so start at dx/2, not 0
@@ -35,16 +37,16 @@ Mesh2D::Mesh2D(int ni, int nj, double v) {
 
     // Same for y
     double dy = yLength/ni;
-    y.resize(njGhosts);
+    y = new double(njGhosts);
     for (int j=0; j<njGhosts; j++) {
         y[j] = (0.5 + j - 2)*dy;
     }
 
     // Set physical arrays
-    rho.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, v));
-    momU.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, v));
-    momV.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, v));
-    E.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, v));
+    ALLOCATE(rho, niGhosts, njGhosts);
+    ALLOCATE(momU, niGhosts, njGhosts);
+    ALLOCATE(momV, niGhosts, njGhosts);
+    ALLOCATE(E, niGhosts, njGhosts);
 }
 
 
@@ -63,7 +65,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     // be 1D arrays, as, for example, all cells with the same j-index will have
     // the same y position.
     dx = xLength/ni;
-    x.resize(niGhosts);
+    x = new double[niGhosts];
 
     // Ghost/boundary cells mean that the first "data" cell is at index 2.
     // Coordinates are for cell centres, so start at dx/2, not 0
@@ -73,16 +75,16 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
 
     // Same for y
     dy = yLength/nj;
-    y.resize(njGhosts);
+    y = new double[njGhosts];
     for (int j=0; j<njGhosts; j++) {
         y[j] = (0.5 + j - 2)*dy;
     }
 
     // Set physical arrays
-    rho.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, 0.0));
-    momU.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, 0.0));
-    momV.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, 0.0));
-    E.resize(nj+2*nghosts, std::vector<double>(ni+2*nghosts, 0.0));
+    ALLOCATE(rho, niGhosts, njGhosts);
+    ALLOCATE(momU, niGhosts, njGhosts);
+    ALLOCATE(momV, niGhosts, njGhosts);
+    ALLOCATE(E, niGhosts, njGhosts);
 
     // Physical parameters for Sod
     const double x0 = 0.5;
@@ -207,8 +209,8 @@ void Mesh2D::dumpToNetCDF() {
     netCDF::NcVar yVar = meshFile.addVar("Y", netCDF::ncDouble, yDim);
     netCDF::NcVar xVar = meshFile.addVar("X", netCDF::ncDouble, xDim);
 
-    xVar.putVar(this->x.data());
-    yVar.putVar(this->y.data());
+    xVar.putVar(this->x);
+    yVar.putVar(this->y);
 
     xVar.putAtt("units", "cm");
     yVar.putAtt("units", "cm");
@@ -244,6 +246,7 @@ void Mesh2D::dumpToNetCDF_NG() {
     int jSize = this->jUpper - this->nghosts;
     int iSize = this->iUpper - this->nghosts;
     double test[jSize][iSize];
+    double xv[iSize], yv[jSize];
 
     netCDF::NcFile meshFile("initial_ng.nc", netCDF::NcFile::FileMode::replace);
 
@@ -255,8 +258,16 @@ void Mesh2D::dumpToNetCDF_NG() {
     netCDF::NcVar yVar = meshFile.addVar("Y", netCDF::ncDouble, yDim);
     netCDF::NcVar xVar = meshFile.addVar("X", netCDF::ncDouble, xDim);
 
-    xVar.putVar(slice(this->x, 2, iUpper).data());
-    yVar.putVar(slice(this->y, 2, jUpper).data());
+    for (int i=2; i<iSize; i++) {
+        xv[i-2] = this->x[i];
+    }
+    xVar.putVar(xv);
+
+    for (int j=2; j<jSize; j++) {
+        yv[j-2] = this->y[j];
+    }
+    yVar.putVar(yv);
+
 
     xVar.putAtt("units", "cm");
     yVar.putAtt("units", "cm");
