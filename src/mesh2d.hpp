@@ -20,6 +20,8 @@ public:
     int iUpper;
     int jUpper;
 
+    int dumpStateNo = 0;
+
     double gamma;
     double dtmax;
     double dx, dy;
@@ -36,9 +38,9 @@ public:
     // Constructor to just produce a Sod mesh
     Mesh2D(int, int, int);
     Mesh2D(int, int, double);
+    void Kill();
     void setBoundaries();
-    void dumpToNetCDF();
-    void dumpToNetCDF_NG();
+    void dumpToSILO(double);
 
     QUANT_2D &getMomentum(Sweep, Direction);
 };

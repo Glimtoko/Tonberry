@@ -1,5 +1,6 @@
 #include "flux.hpp"
 #include <math.h>
+#include <iostream>
 
 Flux::Flux Flux::getFluxHLLC(
     double uL, double vL, double rhoL, double pL,

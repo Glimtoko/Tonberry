@@ -3,6 +3,9 @@
 
 #include <math.h>
 #include <iostream>
+#include <cstdlib>
+
+#include "mpi.h"
 
 double getLimiter1D(double di1, double di2, double omega) {
     double xi;
@@ -98,12 +101,12 @@ void sweep1D(
 
         double pLD = (gamma - 1.0)*(
             EL[i] - 0.5*rhoL[i]*uLD*uLD
-                        - 0.5*rhoL[i]*vLD*vLD
+                  - 0.5*rhoL[i]*vLD*vLD
         );
 
         double pRU = (gamma - 1.0)*(
             ER[i] - 0.5*rhoR[i]*uRU*uRU
-                        - 0.5*rhoR[i]*vRU*vRU
+                  - 0.5*rhoR[i]*vRU*vRU
         );
 
         double dF_rho = f*(calcFluxRho(rhoL[i], uLD) -
@@ -116,7 +119,7 @@ void sweep1D(
                             calcFluxMom(rhoR[i], uRU, vRU, 0.0));
 
         double dF_E = f*(calcFluxE(uLD, EL[i], pLD) -
-                            calcFluxE(uRU, ER[i], pRU));
+                         calcFluxE(uRU, ER[i], pRU));
 
         rhoL[i] += dF_rho;
         rhoR[i] += dF_rho;
@@ -135,15 +138,15 @@ void sweep1D(
         double vLD_cell = momTR[i]/rhoR[i];
         double pLD_cell = (gamma - 1.0)*(
             ER[i] - 0.5*rhoR[i]*uLD_cell*uLD_cell
-                            - 0.5*rhoR[i]*vLD_cell*vLD_cell
+                  - 0.5*rhoR[i]*vLD_cell*vLD_cell
         );
 
-        double rhoRU_cell = rhoR[i+1];
-        double uRU_cell = momNR[i+1]/rhoR[i+1];
-        double vRU_cell = momTR[i+1]/rhoR[i+1];
+        double rhoRU_cell = rhoL[i+1];
+        double uRU_cell = momNL[i+1]/rhoL[i+1];
+        double vRU_cell = momTL[i+1]/rhoL[i+1];
         double pRU_cell = (gamma - 1.0)*(
             EL[i+1] - 0.5*rhoL[i+1]*uRU_cell*uRU_cell
-                                    - 0.5*rhoL[i+1]*vRU_cell*vRU_cell
+                    - 0.5*rhoL[i+1]*vRU_cell*vRU_cell
         );
 
         flux[i] = Flux::getFluxHLLC(
@@ -184,8 +187,8 @@ double getTimestep(Mesh2D mesh) {
                              - 0.5*mesh.rho[j][i]*v*v
             );
             double a = sqrt((mesh.gamma*p)/mesh.rho[j][i]);
-            Sx = std::max(Sx, a + u);
-            Sy = std::max(Sy, a + v);
+            Sx = std::max(Sx, a + abs(u));
+            Sy = std::max(Sy, a + abs(v));
         }
     }
     return std::min(mesh.dtmax, std::min(mesh.cfl*mesh.dx/Sx, mesh.cfl*mesh.dy/Sy));
@@ -194,33 +197,91 @@ double getTimestep(Mesh2D mesh) {
 
 void sweepX(Mesh2D &mesh, double dt) {
     int ni = mesh.niGhosts;
+    int nj = mesh.jUpper - 2;
     int iUpper = mesh.iUpper;
     int jUpper = mesh.jUpper;
     double gamma = mesh.gamma;
     double dx = mesh.dx;
+
+    // MPI environment
+    int nprocs, myrank, error;
+    nprocs = MPI::COMM_WORLD.Get_size();
+    myrank = MPI::COMM_WORLD.Get_rank();
+
+    // Get decomposition size
+    int njDecomp = nj/nprocs;
+
+    // Create a full 1D representation of the data
+    QUANT_1D rhoAll = new double[ni*nj];
+    QUANT_1D momNAll = new double[ni*nj];
+    QUANT_1D momTAll = new double[ni*nj];
+    QUANT_1D EAll = new double[ni*nj];
+
+    int index = 0;
+    for (int j=2; j<jUpper; j++) {
+        for (int i=0; i<ni; i++) {
+            rhoAll[index] = mesh.rho[j][i];
+            momNAll[index] = mesh.momU[j][i];
+            momTAll[index] = mesh.momV[j][i];
+            EAll[index] = mesh.E[j][i];
+
+            index += 1;
+        }
+    }
+
+    // Local 1D representation of data
+    QUANT_1D rhoLocal = new double[ni*njDecomp];
+    QUANT_1D momNLocal = new double[ni*njDecomp];
+    QUANT_1D momTLocal = new double[ni*njDecomp];
+    QUANT_1D ELocal = new double[ni*njDecomp];
+
+    MPI::COMM_WORLD.Scatter(rhoAll, ni*njDecomp, MPI::DOUBLE, rhoLocal, ni*njDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Scatter(momNAll, ni*njDecomp, MPI::DOUBLE, momNLocal, ni*njDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Scatter(momTAll, ni*njDecomp, MPI::DOUBLE, momTLocal, ni*njDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Scatter(EAll, ni*njDecomp, MPI::DOUBLE, ELocal, ni*njDecomp, MPI::DOUBLE, 0);
 
     QUANT_1D rho = new double[ni];
     QUANT_1D momN = new double[ni];
     QUANT_1D momT = new double[ni];
     QUANT_1D E = new double[ni];
 
-    for (int j=2; j<jUpper; j++) {
+    index = 0;
+    int index2 = 0;
+    for (int j=0; j<njDecomp; j++) {
         // Pack 1D data
         for (int i=0; i<ni; i++) {
-            rho[i] = mesh.rho[j][i];
-            momN[i] = mesh.momU[j][i];
-            momT[i] = mesh.momV[j][i];
-            E[i] = mesh.E[j][i];
+            rho[i] = rhoLocal[index];
+            momN[i] = momNLocal[index];
+            momT[i] = momTLocal[index];
+            E[i] = ELocal[index];
+            index++;
         }
         // Sweep
         sweep1D(rho, E, momN, momT, ni, iUpper, gamma, dt, dx);
 
         // Unpack 1D data
         for (int i=0; i<ni; i++) {
-            mesh.rho[j][i] = rho[i];
-            mesh.momU[j][i] = momN[i];
-            mesh.momV[j][i] = momT[i];
-            mesh.E[j][i] = E[i];
+            rhoLocal[index2] = rho[i];
+            momNLocal[index2] = momN[i];
+            momTLocal[index2] = momT[i];
+            ELocal[index2] = E[i];
+            index2++;
+        }
+    }
+
+    MPI::COMM_WORLD.Gather(rhoLocal, ni*njDecomp, MPI::DOUBLE, rhoAll, ni*njDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Gather(momNLocal, ni*njDecomp, MPI::DOUBLE, momNAll, ni*njDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Gather(momTLocal, ni*njDecomp, MPI::DOUBLE, momTAll, ni*njDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Gather(ELocal, ni*njDecomp, MPI::DOUBLE, EAll, ni*njDecomp, MPI::DOUBLE, 0);
+
+    index = 0;
+    for (int j=2; j<jUpper; j++) {
+        for (int i=0; i<ni; i++) {
+            mesh.rho[j][i] = rhoAll[index];
+            mesh.momU[j][i] = momNAll[index];
+            mesh.momV[j][i] = momTAll[index];
+            mesh.E[j][i] = EAll[index];
+            index += 1;
         }
     }
 
@@ -228,6 +289,16 @@ void sweepX(Mesh2D &mesh, double dt) {
     delete[] momN;
     delete[] momT;
     delete[] E;
+
+    delete[] rhoAll;
+    delete[] momNAll;
+    delete[] momTAll;
+    delete[] EAll;
+
+    delete[] rhoLocal;
+    delete[] momNLocal;
+    delete[] momTLocal;
+    delete[] ELocal;
 
     // Boundary update
     mesh.setBoundaries();
@@ -236,33 +307,91 @@ void sweepX(Mesh2D &mesh, double dt) {
 
 void sweepY(Mesh2D &mesh, double dt) {
     int nj = mesh.njGhosts;
+    int ni = mesh.iUpper - 2;
     int iUpper = mesh.iUpper;
     int jUpper = mesh.jUpper;
     double gamma = mesh.gamma;
     double dy = mesh.dy;
+
+    // MPI environment
+    int nprocs, myrank, error;
+    nprocs = MPI::COMM_WORLD.Get_size();
+    myrank = MPI::COMM_WORLD.Get_rank();
+
+    // Get decomposition size
+    int niDecomp = ni/nprocs;
+
+    // Create a full 1D representation of the data
+    QUANT_1D rhoAll = new double[ni*nj];
+    QUANT_1D momNAll = new double[ni*nj];
+    QUANT_1D momTAll = new double[ni*nj];
+    QUANT_1D EAll = new double[ni*nj];
+
+    int index = 0;
+    for (int i=2; i<iUpper; i++) {
+        for (int j=0; j<nj; j++) {
+            rhoAll[index] = mesh.rho[j][i];
+            momNAll[index] = mesh.momV[j][i];
+            momTAll[index] = mesh.momU[j][i];
+            EAll[index] = mesh.E[j][i];
+
+            index += 1;
+        }
+    }
+
+    // Local 1D representation of data
+    QUANT_1D rhoLocal = new double[nj*niDecomp];
+    QUANT_1D momNLocal = new double[nj*niDecomp];
+    QUANT_1D momTLocal = new double[nj*niDecomp];
+    QUANT_1D ELocal = new double[nj*niDecomp];
+
+    MPI::COMM_WORLD.Scatter(rhoAll, nj*niDecomp, MPI::DOUBLE, rhoLocal, nj*niDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Scatter(momNAll, nj*niDecomp, MPI::DOUBLE, momNLocal, nj*niDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Scatter(momTAll, nj*niDecomp, MPI::DOUBLE, momTLocal, nj*niDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Scatter(EAll, nj*niDecomp, MPI::DOUBLE, ELocal, nj*niDecomp, MPI::DOUBLE, 0);
 
     QUANT_1D rho = new double[nj];
     QUANT_1D momN = new double[nj];
     QUANT_1D momT = new double[nj];
     QUANT_1D E = new double[nj];
 
-    for (int i=2; i<iUpper; i++) {
+    int index2 = 0;
+    index = 0;
+    for (int i=0; i<niDecomp; i++) {
         // Pack 1D data
         for (int j=0; j<nj; j++) {
-            rho[j] = mesh.rho[j][i];
-            momN[j] = mesh.momV[j][i];
-            momT[j] = mesh.momU[j][i];
-            E[j] = mesh.E[j][i];
+            rho[j] = rhoLocal[index];
+            momN[j] = momNLocal[index];
+            momT[j] = momTLocal[index];
+            E[j] = ELocal[index];
+            index++;
         }
         // Sweep
         sweep1D(rho, E, momN, momT, nj, jUpper, gamma, dt, dy);
 
         // Unpack 1D data
         for (int j=0; j<nj; j++) {
-            mesh.rho[j][i] = rho[j];
-            mesh.momV[j][i] = momN[j];
-            mesh.momU[j][i] = momT[j];
-            mesh.E[j][i] = E[j];
+            rhoLocal[index2] = rho[j];
+            momNLocal[index2] = momN[j];
+            momTLocal[index2] = momT[j];
+            ELocal[index2] = E[j];
+            index2++;
+        }
+    }
+
+    MPI::COMM_WORLD.Gather(rhoLocal, nj*niDecomp, MPI::DOUBLE, rhoAll, nj*niDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Gather(momNLocal, nj*niDecomp, MPI::DOUBLE, momNAll, nj*niDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Gather(momTLocal, nj*niDecomp, MPI::DOUBLE, momTAll, nj*niDecomp, MPI::DOUBLE, 0);
+    MPI::COMM_WORLD.Gather(ELocal, nj*niDecomp, MPI::DOUBLE, EAll, nj*niDecomp, MPI::DOUBLE, 0);
+
+    index = 0;
+    for (int i=2; i<iUpper; i++) {
+        for (int j=0; j<nj; j++) {
+            mesh.rho[j][i] = rhoAll[index];
+            mesh.momU[j][i] = momTAll[index];
+            mesh.momV[j][i] = momNAll[index];
+            mesh.E[j][i] = EAll[index];
+            index += 1;
         }
     }
 
@@ -270,6 +399,16 @@ void sweepY(Mesh2D &mesh, double dt) {
     delete[] momN;
     delete[] momT;
     delete[] E;
+
+    delete[] rhoAll;
+    delete[] momNAll;
+    delete[] momTAll;
+    delete[] EAll;
+
+    delete[] rhoLocal;
+    delete[] momNLocal;
+    delete[] momTLocal;
+    delete[] ELocal;
 
     // Boundary update
     mesh.setBoundaries();

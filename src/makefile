@@ -4,12 +4,13 @@ CFLAGS = -O3 -std=c++17
 
 OBJECTS = main.o mesh2d.o flux.o update.o
 
-BOOST_DIR=/prod/boost
-BOOST_INC=$(BOOST_DIR)/include
-BOOST_LIB=$(BOOST_DIR)/lib
+# Expected library locations
+PROD := /usr/local/prod
+SILO_DIR := $(PROD)/silo-4.10.2-bsd
+HDF5_DIR := $(PROD)/hdf5_oldapi
 
-INC = -I$(BOOST_INC)
-LIB = -L$(BOOST_LIB) -lboost_program_options -lboost_mpi -lnetcdf_c++4 -lnetcdf
+INC = -I$(SILO_DIR)/include -I$(HDF5_DIR)/include
+LIB = -L$(SILO_DIR)/lib -lsiloh5 -lnetcdf_c++4 -L$(HDF5_DIR)/lib -lhdf5 -Wl,-rpath $(PROD)/hdf5/lib
 
 .PHONY: clean
 
