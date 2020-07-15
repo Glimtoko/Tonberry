@@ -4,6 +4,9 @@ CFLAGS = -O3 -std=c++17
 
 OBJECTS = main.o mesh2d.o flux.o update.o
 
+# Installation directory
+INSTALL_DIR := /prod/Tonberry/bin/
+
 # Expected library locations
 PROD := /usr/local/prod
 SILO_DIR := $(PROD)/silo-4.10.2-bsd
@@ -21,6 +24,11 @@ clean:
 	-rm *.o
 	-rm tonberry
 
+
+install: tonberry
+	@echo Installing to $(INSTALL_DIR)
+	cp tonberry $(INSTALL_DIR)
+	chmod +x $(INSTALL_DIR)/tonberry
 
 main.o: mesh2d.o flux.o update.o
 
