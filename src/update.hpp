@@ -4,7 +4,7 @@
 #include "sweep.hpp"
 
 void sweep1D(
-    QUANT_1D &rho, QUANT_1D &E, QUANT_1D &momN, QUANT_1D &momT,
+    double* &rho, double* &E, double* &momN, double* &momT,
     int ni, int iUpper, double gamma, double dt, double dx);
 
 double getTimestep(Mesh2D);

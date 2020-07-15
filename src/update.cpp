@@ -24,7 +24,7 @@ double getLimiter1D(double di1, double di2, double omega) {
     return xi;
 }
 
-double getSlope1D(QUANT_1D U, int i, double omega) {
+double getSlope1D(double* U, int i, double omega) {
     double di1 = U[i] - U[i-1];
     double di2 = U[i+1] - U[i];
 
@@ -52,19 +52,19 @@ inline double calcFluxE(double u, double E, double p) {
 
 
 void sweep1D(
-    QUANT_1D &rho, QUANT_1D &E, QUANT_1D &momN, QUANT_1D &momT,
+    double* &rho, double* &E, double* &momN, double* &momT,
     int ni, int iUpper, double gamma, double dt, double dx)
 {
     double omega = 0.0;
 
-    QUANT_1D rhoL = new double[ni];
-    QUANT_1D rhoR = new double[ni];
-    QUANT_1D momTL = new double[ni];
-    QUANT_1D momTR = new double[ni];
-    QUANT_1D momNL = new double[ni];
-    QUANT_1D momNR = new double[ni];
-    QUANT_1D EL = new double[ni];
-    QUANT_1D ER = new double[ni];
+    double* rhoL = new double[ni];
+    double* rhoR = new double[ni];
+    double* momTL = new double[ni];
+    double* momTR = new double[ni];
+    double* momNL = new double[ni];
+    double* momNR = new double[ni];
+    double* EL = new double[ni];
+    double* ER = new double[ni];
 
     std::vector<Flux::Flux> flux;
     flux.resize(ni);
@@ -180,13 +180,13 @@ double getTimestep(Mesh2D mesh) {
     double Sx = 0.0, Sy = 0.0;
     for (int j=0; j<mesh.njGhosts-1; j++) {
         for (int i=0; i<mesh.niGhosts-1; i++) {
-            double u = mesh.momU[j][i]/mesh.rho[j][i];
-            double v = mesh.momV[j][i]/mesh.rho[j][i];
+            double u = GET(mesh, momU, j, i)/GET(mesh, rho, j, i);
+            double v = GET(mesh, momV, j, i)/GET(mesh, rho, j, i);
             double p = (mesh.gamma - 1.0)*(
-                mesh.E[j][i] - 0.5*mesh.rho[j][i]*u*u
-                             - 0.5*mesh.rho[j][i]*v*v
+                GET(mesh, E, j, i) - 0.5*GET(mesh, rho, j, i)*u*u
+                                   - 0.5*GET(mesh, rho, j, i)*v*v
             );
-            double a = sqrt((mesh.gamma*p)/mesh.rho[j][i]);
+            double a = sqrt((mesh.gamma*p)/GET(mesh, rho, j, i));
             Sx = std::max(Sx, a + abs(u));
             Sy = std::max(Sy, a + abs(v));
         }
@@ -212,38 +212,38 @@ void sweepX(Mesh2D &mesh, double dt) {
     int njDecomp = nj/nprocs;
 
     // Create a full 1D representation of the data
-    QUANT_1D rhoAll = new double[ni*nj];
-    QUANT_1D momNAll = new double[ni*nj];
-    QUANT_1D momTAll = new double[ni*nj];
-    QUANT_1D EAll = new double[ni*nj];
+    double* rhoAll = new double[ni*nj];
+    double* momNAll = new double[ni*nj];
+    double* momTAll = new double[ni*nj];
+    double* EAll = new double[ni*nj];
 
     int index = 0;
     for (int j=2; j<jUpper; j++) {
         for (int i=0; i<ni; i++) {
-            rhoAll[index] = mesh.rho[j][i];
-            momNAll[index] = mesh.momU[j][i];
-            momTAll[index] = mesh.momV[j][i];
-            EAll[index] = mesh.E[j][i];
+            rhoAll[index] = GET(mesh, rho, j, i);
+            momNAll[index] = GET(mesh, momU, j, i);
+            momTAll[index] = GET(mesh, momV, j, i);
+            EAll[index] = GET(mesh, E, j, i);
 
             index += 1;
         }
     }
 
     // Local 1D representation of data
-    QUANT_1D rhoLocal = new double[ni*njDecomp];
-    QUANT_1D momNLocal = new double[ni*njDecomp];
-    QUANT_1D momTLocal = new double[ni*njDecomp];
-    QUANT_1D ELocal = new double[ni*njDecomp];
+    double* rhoLocal = new double[ni*njDecomp];
+    double* momNLocal = new double[ni*njDecomp];
+    double* momTLocal = new double[ni*njDecomp];
+    double* ELocal = new double[ni*njDecomp];
 
     MPI::COMM_WORLD.Scatter(rhoAll, ni*njDecomp, MPI::DOUBLE, rhoLocal, ni*njDecomp, MPI::DOUBLE, 0);
     MPI::COMM_WORLD.Scatter(momNAll, ni*njDecomp, MPI::DOUBLE, momNLocal, ni*njDecomp, MPI::DOUBLE, 0);
     MPI::COMM_WORLD.Scatter(momTAll, ni*njDecomp, MPI::DOUBLE, momTLocal, ni*njDecomp, MPI::DOUBLE, 0);
     MPI::COMM_WORLD.Scatter(EAll, ni*njDecomp, MPI::DOUBLE, ELocal, ni*njDecomp, MPI::DOUBLE, 0);
 
-    QUANT_1D rho = new double[ni];
-    QUANT_1D momN = new double[ni];
-    QUANT_1D momT = new double[ni];
-    QUANT_1D E = new double[ni];
+    double* rho = new double[ni];
+    double* momN = new double[ni];
+    double* momT = new double[ni];
+    double* E = new double[ni];
 
     index = 0;
     int index2 = 0;
@@ -277,10 +277,10 @@ void sweepX(Mesh2D &mesh, double dt) {
     index = 0;
     for (int j=2; j<jUpper; j++) {
         for (int i=0; i<ni; i++) {
-            mesh.rho[j][i] = rhoAll[index];
-            mesh.momU[j][i] = momNAll[index];
-            mesh.momV[j][i] = momTAll[index];
-            mesh.E[j][i] = EAll[index];
+            GET(mesh, rho, j, i) = rhoAll[index];
+            GET(mesh, momU, j, i) = momNAll[index];
+            GET(mesh, momV, j, i) = momTAll[index];
+            GET(mesh, E, j, i) = EAll[index];
             index += 1;
         }
     }
@@ -322,38 +322,38 @@ void sweepY(Mesh2D &mesh, double dt) {
     int niDecomp = ni/nprocs;
 
     // Create a full 1D representation of the data
-    QUANT_1D rhoAll = new double[ni*nj];
-    QUANT_1D momNAll = new double[ni*nj];
-    QUANT_1D momTAll = new double[ni*nj];
-    QUANT_1D EAll = new double[ni*nj];
+    double* rhoAll = new double[ni*nj];
+    double* momNAll = new double[ni*nj];
+    double* momTAll = new double[ni*nj];
+    double* EAll = new double[ni*nj];
 
     int index = 0;
     for (int i=2; i<iUpper; i++) {
         for (int j=0; j<nj; j++) {
-            rhoAll[index] = mesh.rho[j][i];
-            momNAll[index] = mesh.momV[j][i];
-            momTAll[index] = mesh.momU[j][i];
-            EAll[index] = mesh.E[j][i];
+            rhoAll[index] = GET(mesh, rho, j, i);
+            momNAll[index] = GET(mesh, momV, j, i);
+            momTAll[index] = GET(mesh, momU, j, i);
+            EAll[index] = GET(mesh, E, j, i);
 
             index += 1;
         }
     }
 
     // Local 1D representation of data
-    QUANT_1D rhoLocal = new double[nj*niDecomp];
-    QUANT_1D momNLocal = new double[nj*niDecomp];
-    QUANT_1D momTLocal = new double[nj*niDecomp];
-    QUANT_1D ELocal = new double[nj*niDecomp];
+    double* rhoLocal = new double[nj*niDecomp];
+    double* momNLocal = new double[nj*niDecomp];
+    double* momTLocal = new double[nj*niDecomp];
+    double* ELocal = new double[nj*niDecomp];
 
     MPI::COMM_WORLD.Scatter(rhoAll, nj*niDecomp, MPI::DOUBLE, rhoLocal, nj*niDecomp, MPI::DOUBLE, 0);
     MPI::COMM_WORLD.Scatter(momNAll, nj*niDecomp, MPI::DOUBLE, momNLocal, nj*niDecomp, MPI::DOUBLE, 0);
     MPI::COMM_WORLD.Scatter(momTAll, nj*niDecomp, MPI::DOUBLE, momTLocal, nj*niDecomp, MPI::DOUBLE, 0);
     MPI::COMM_WORLD.Scatter(EAll, nj*niDecomp, MPI::DOUBLE, ELocal, nj*niDecomp, MPI::DOUBLE, 0);
 
-    QUANT_1D rho = new double[nj];
-    QUANT_1D momN = new double[nj];
-    QUANT_1D momT = new double[nj];
-    QUANT_1D E = new double[nj];
+    double* rho = new double[nj];
+    double* momN = new double[nj];
+    double* momT = new double[nj];
+    double* E = new double[nj];
 
     int index2 = 0;
     index = 0;
@@ -387,10 +387,10 @@ void sweepY(Mesh2D &mesh, double dt) {
     index = 0;
     for (int i=2; i<iUpper; i++) {
         for (int j=0; j<nj; j++) {
-            mesh.rho[j][i] = rhoAll[index];
-            mesh.momU[j][i] = momTAll[index];
-            mesh.momV[j][i] = momNAll[index];
-            mesh.E[j][i] = EAll[index];
+            GET(mesh, rho, j, i) = rhoAll[index];
+            GET(mesh, momU, j, i) = momTAll[index];
+            GET(mesh, momV, j, i) = momNAll[index];
+            GET(mesh, E, j, i) = EAll[index];
             index += 1;
         }
     }

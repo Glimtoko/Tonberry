@@ -11,50 +11,6 @@
 
 #include "mesh2d.hpp"
 
-#define WRITEFULL(A,B) for (int j=0; j<this->njGhosts; j++) {for (int i=0; i<this->niGhosts; i++) {test[j][i] = B[j][i];}} A.putVar(test);
-
-#define WRITENG(A,B) for (int j=2; j<this->jUpper; j++) {for (int i=2; i<this->jUpper; i++) {test[j-2][i-2] = B[j][i];}} A.putVar(test);
-
-
-
-Mesh2D::Mesh2D(int ni, int nj, double v) {
-    // Set X and Y lengths for Sod
-    double xLength = 1.0;
-    double yLength = 1.0;
-
-    // Number of ghosts on each mesh side
-    niGhosts = ni + 2*nghosts;
-    njGhosts = nj + 2*nghosts;
-    iUpper = ni + nghosts;
-    jUpper = nj + nghosts;
-
-    // Set coordinate arrays. Since this is a cartesian mesh, these need only
-    // be 1D arrays, as, for example, all cells with the same j-index will have
-    // the same y position.
-    double dx = xLength/ni;
-    x = new double(niGhosts);
-
-    // Ghost/boundary cells mean that the first "data" cell is at index 2.
-    // Coordinates are for cell centres, so start at dx/2, not 0
-    for (int i=0; i<niGhosts; i++) {
-        x[i] = (0.5 + i - 2)*dx;
-    }
-
-    // Same for y
-    double dy = yLength/ni;
-    y = new double(njGhosts);
-    for (int j=0; j<njGhosts; j++) {
-        y[j] = (0.5 + j - 2)*dy;
-    }
-
-    // Set physical arrays
-    ALLOCATE(rho, niGhosts, njGhosts);
-    ALLOCATE(momU, niGhosts, njGhosts);
-    ALLOCATE(momV, niGhosts, njGhosts);
-    ALLOCATE(E, niGhosts, njGhosts);
-}
-
-
 Mesh2D::Mesh2D(int ni, int nj, int xy) {
     // Set X and Y lengths for Sod
     double xLength = 1.0;
@@ -96,10 +52,10 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     }
 
     // Set physical arrays
-    ALLOCATE(rho, niGhosts, njGhosts);
-    ALLOCATE(momU, niGhosts, njGhosts);
-    ALLOCATE(momV, niGhosts, njGhosts);
-    ALLOCATE(E, niGhosts, njGhosts);
+    rho = new double[njGhosts*niGhosts];
+    momU = new double[njGhosts*niGhosts];
+    momV = new double[njGhosts*niGhosts];
+    E = new double[njGhosts*niGhosts];
 
     // Boundary values
     double bL = 1.0;
@@ -128,10 +84,10 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             double cellE = x[i] < x0 ? rhoL*(0.5*uL*uL + e) : rhoR*(0.5*uR*uR + e);
 
             for (int j=2; j<jUpper; j++) {
-                rho[j][i] = cellRho;
-                momU[j][i] = cellMom;
-                momV[j][i] = 0.0;
-                E[j][i] = cellE;
+                _LGET(rho, j, i) = cellRho;
+                _LGET(momU, j, i) = cellMom;
+                _LGET(momV, j, i) = 0.0;
+                _LGET(E, j, i) = cellE;
             }
         }
     } else if (xy==1) {
@@ -142,10 +98,10 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             // E has a w**2 term, but it's always zero here... (actually, so is u...)
             double cellE = y[j] < x0 ? rhoL*(0.5*uL*uL + e) : rhoR*(0.5*uR*uR + e);
             for (int i=2; i<iUpper; i++) {
-                rho[j][i] = cellRho;
-                momV[j][i] = cellMom;
-                momU[j][i] = 0.0;
-                E[j][i] = cellE;
+                _LGET(rho, j, i) = cellRho;
+                _LGET(momV, j, i) = cellMom;
+                _LGET(momU, j, i) = 0.0;
+                _LGET(E, j, i) = cellE;
             }
         }
     } else if (xy == 2) {
@@ -157,10 +113,10 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 double e = r < x0 ? pL/((gamma - 1.0)*rhoL) : pR/((gamma - 1.0)*rhoR);
                 double cellE = r < x0 ? rhoL*e : rhoR*e;
 
-                rho[j][i] = cellRho;
-                momV[j][i] = 0.0;
-                momU[j][i] = 0.0;
-                E[j][i] = cellE;
+                _LGET(rho, j, i) = cellRho;
+                _LGET(momV, j, i) = 0.0;
+                _LGET(momU, j, i) = 0.0;
+                _LGET(E, j, i) = cellE;
             }
         }
     } else if (xy == 3) {
@@ -177,13 +133,13 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 double v = v0 + (y[j] - y0)*f;
                 double T = 1 - ((gamma-1)*B*B)/(8*gamma*pi*pi)*exp(1-r*r);
 
-                rho[j][i] = pow(T, (1/(gamma-1)));
-                momU[j][i] = rho[j][i]*u;
-                momV[j][i] = rho[j][i]*v;
+                _LGET(rho, j, i) = pow(T, (1/(gamma-1)));
+                _LGET(momU, j, i) = _LGET(rho, j, i)*u;
+                _LGET(momV, j, i) = _LGET(rho, j, i)*v;
 
-                double p = rho[j][i]*T;
-                double e = p/((gamma - 1)*rho[j][i]);
-                E[j][i] = rho[j][i]*(e + 0.5*u*u + 0.5*v*v);
+                double p = _LGET(rho, j, i)*T;
+                double e = p/((gamma - 1)*_LGET(rho, j, i));
+                _LGET(E, j, i) = _LGET(rho, j, i)*(e + 0.5*u*u + 0.5*v*v);
             }
         }
     } else if (xy == 4) {
@@ -193,18 +149,20 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             for (int i=2; i<iUpper; i++) {
                 double r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x0, 2));
                 if (r <= 2.0) {
-                    rho[j][i] = 1.0;
+                    _LGET(rho, j, i) = 1.0;
                     p = 1.0;
                 } else {
-                    rho[j][i] = 0.125;
+                    _LGET(rho, j, i) = 0.125;
                     p = 0.1;
                 }
 
                 r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x1, 2));
-                if (r <= 2.0) rho[j][i] = 0.5;
+                if (r <= 2.0) _LGET(rho, j, i) = 0.5;
 
-                double e = p/((gamma - 1.0)*rho[j][i]);
-                E[j][i] = e*rho[j][i];
+                double e = p/((gamma - 1.0)*_LGET(rho, j, i));
+                _LGET(E, j, i) = e*_LGET(rho, j, i);
+                _LGET(momU, j, i) = 0.0;
+                _LGET(momV, j, i) = 0.0;
             }
         }
         // Set reflective boundaries top and bottom
@@ -230,61 +188,49 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
 
 void Mesh2D::setBoundaries() {
     for (int i=2; i<iUpper; i++) {
-        double f = -1.0;
-        rho[1][i] = rho[2][i];
-        rho[0][i] = rho[3][i];
-        rho[njGhosts-2][i] = rho[njGhosts-3][i];
-        rho[njGhosts-1][i] = rho[njGhosts-4][i];
+        _LGET(rho, 1, i) = _LGET(rho, 2, i);
+        _LGET(rho, 0, i) = _LGET(rho, 3, i);
+        _LGET(rho, njGhosts-2, i) = _LGET(rho, njGhosts-3, i);
+        _LGET(rho, njGhosts-1, i) = _LGET(rho, njGhosts-4, i);
 
-        momU[1][i] = momU[2][i];
-        momU[0][i] = momU[3][i];
-        momU[njGhosts-2][i] = momU[njGhosts-3][i];
-        momU[njGhosts-1][i] = momU[njGhosts-4][i];
+        _LGET(momU, 1, i) = _LGET(momU, 2, i);
+        _LGET(momU, 0, i) = _LGET(momU, 3, i);
+        _LGET(momU, njGhosts-2, i) = _LGET(momU, njGhosts-3, i);
+        _LGET(momU, njGhosts-1, i) = _LGET(momU, njGhosts-4, i);
 
-        momV[1][i] = meshBoundaryUD[0]*momV[2][i];
-        momV[0][i] = meshBoundaryUD[0]*momV[3][i];
-        momV[njGhosts-2][i] = meshBoundaryUD[1]*momV[njGhosts-3][i];
-        momV[njGhosts-1][i] = meshBoundaryUD[1]*momV[njGhosts-4][i];
+        _LGET(momV, 1, i) = meshBoundaryUD[0]*_LGET(momV, 2, i);
+        _LGET(momV, 0, i) = meshBoundaryUD[0]*_LGET(momV, 3, i);
+        _LGET(momV, njGhosts-2, i) = meshBoundaryUD[1]*_LGET(momV, njGhosts-3, i);
+        _LGET(momV, njGhosts-1, i) = meshBoundaryUD[1]*_LGET(momV, njGhosts-4, i);
 
-        E[1][i] = E[2][i];
-        E[0][i] = E[3][i];
-        E[njGhosts-2][i] = E[njGhosts-3][i];
-        E[njGhosts-1][i] = E[njGhosts-4][i];
+        _LGET(E, 1, i) = _LGET(E, 2, i);
+        _LGET(E, 0, i) = _LGET(E, 3, i);
+        _LGET(E, njGhosts-2, i) = _LGET(E, njGhosts-3, i);
+        _LGET(E, njGhosts-1, i) = _LGET(E, njGhosts-4, i);
     }
 
     for (int j=2; j<jUpper; j++) {
-        double f = 1.0;
-        rho[j][1] = rho[j][2];
-        rho[j][0] = rho[j][3];
-        rho[j][niGhosts-2] = rho[j][niGhosts-3];
-        rho[j][niGhosts-1] = rho[j][niGhosts-4];
+        _LGET(rho, j, 1) = _LGET(rho, j, 2);
+        _LGET(rho, j, 0) = _LGET(rho, j, 3);
+        _LGET(rho, j, niGhosts-2) = _LGET(rho, j, niGhosts-3);
+        _LGET(rho, j, niGhosts-1) = _LGET(rho, j, niGhosts-4);
 
-        momU[j][1] = meshBoundaryLR[0]*momU[j][2];
-        momU[j][0] = meshBoundaryLR[0]*momU[j][3];
-        momU[j][niGhosts-2] = meshBoundaryLR[1]*momU[j][niGhosts-3];
-        momU[j][niGhosts-1] = meshBoundaryLR[1]*momU[j][niGhosts-4];
+        _LGET(momU, j, 1) = meshBoundaryLR[0]*_LGET(momU, j, 2);
+        _LGET(momU, j, 0) = meshBoundaryLR[0]*_LGET(momU, j, 3);
+        _LGET(momU, j, niGhosts-2) = meshBoundaryLR[1]*_LGET(momU, j, niGhosts-3);
+        _LGET(momU, j, niGhosts-1) = meshBoundaryLR[1]*_LGET(momU, j, niGhosts-4);
 
-        momV[j][1] = momV[j][2];
-        momV[j][0] = momV[j][3];
-        momV[j][niGhosts-2] = momV[j][niGhosts-3];
-        momV[j][niGhosts-1] = momV[j][niGhosts-4];
+        _LGET(momV, j, 1) = _LGET(momV, j, 2);
+        _LGET(momV, j, 0) = _LGET(momV, j, 3);
+        _LGET(momV, j, niGhosts-2) = _LGET(momV, j, niGhosts-3);
+        _LGET(momV, j, niGhosts-1) = _LGET(momV, j, niGhosts-4);
 
-        E[j][1] = E[j][2];
-        E[j][0] = E[j][3];
-        E[j][niGhosts-2] = E[j][niGhosts-3];
-        E[j][niGhosts-1] = E[j][niGhosts-4];
+        _LGET(E, j, 1) = _LGET(E, j, 2);
+        _LGET(E, j, 0) = _LGET(E, j, 3);
+        _LGET(E, j, niGhosts-2) = _LGET(E, j, niGhosts-3);
+        _LGET(E, j, niGhosts-1) = _LGET(E, j, niGhosts-4);
     }
 
-}
-
-template<typename T>
-std::vector<T> slice(std::vector<T> const &v, int m, int n)
-{
-	auto first = v.cbegin() + m;
-	auto last = v.cbegin() + n + 1;
-
-	std::vector<T> vec(first, last);
-	return vec;
 }
 
 void Mesh2D::dumpToSILO(double time) {
@@ -337,7 +283,7 @@ void Mesh2D::dumpToSILO(double time) {
     int index = 0;
     for (int j=2; j<this->jUpper; j++) {
         for (int i=2; i<this->iUpper; i++) {
-            data[index++] = this->rho[j][i];
+            data[index++] = _PGET(this, rho, j, i);
         }
     }
 
@@ -348,7 +294,7 @@ void Mesh2D::dumpToSILO(double time) {
     DBClose(file);
 }
 
-QUANT_2D &Mesh2D::getMomentum(Sweep sweep, Direction direction) {
+double* &Mesh2D::getMomentum(Sweep sweep, Direction direction) {
     switch (sweep) {
         case Sweep::x:
             switch (direction) {
