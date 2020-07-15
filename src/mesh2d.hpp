@@ -27,6 +27,9 @@ public:
     double dx, dy;
     double cfl;
 
+    QUANT_1D meshBoundaryUD;
+    QUANT_1D meshBoundaryLR;
+
     QUANT_1D x;
     QUANT_1D y;
 

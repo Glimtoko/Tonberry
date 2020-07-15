@@ -10,12 +10,12 @@ int main(int argc, char* argv[]) {
     //feenableexcept(FE_INVALID | FE_OVERFLOW);
 
     // Mesh sizes - hardcoded for now
-    const int ni = 250;
-    const int nj = 250;
-    const int problem = 2;
+    const int ni = 600;
+    const int nj = 200;
+    const int problem = 4;
 
     const double dtOut = 0.05;
-    const double tEnd = 2.0;
+    const double tEnd = 30.0;
 
     // Initialise MPI
     MPI::Init(argc, argv);
@@ -54,7 +54,6 @@ int main(int argc, char* argv[]) {
         sweepX(mesh, dt/2.0);
         sweepY(mesh, dt);
         sweepX(mesh, dt/2.0);
-//         mesh.setBoundaries();
 
         t += dt;
         if (t >= outNext) {
@@ -64,18 +63,7 @@ int main(int argc, char* argv[]) {
         if (t > tEnd || step > 10000) break;
     }
 
-    std::cout << step << std::endl;
-    if (myrank == 0) {
-//         mesh.dumpToNetCDF();
-//         mesh.dumpToNetCDF_NG();
-//         mesh.dumpToSILO(5.0);
-    }
-
-//     mesh.Kill();
-
-//     for (int i=2; i<mesh.jUpper; i++) {
-//         std::cout << i << " " << mesh.y[i] << " " << mesh.rho[i][2] << " " << mesh.momV[i][2] << std::endl;
-//     }
+    mesh.Kill();
 
     MPI::Finalize();
     return 0;

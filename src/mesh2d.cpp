@@ -65,6 +65,11 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
         yLength = 10.0;
     }
 
+    if (xy == 4) {
+        xLength = 30.0;
+        yLength = 10.0;
+    }
+
     // Number of ghosts on each mesh side
     niGhosts = ni + 2*nghosts;
     njGhosts = nj + 2*nghosts;
@@ -95,6 +100,12 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     ALLOCATE(momU, niGhosts, njGhosts);
     ALLOCATE(momV, niGhosts, njGhosts);
     ALLOCATE(E, niGhosts, njGhosts);
+
+    // Boundary values
+    double bL = 1.0;
+    double bR = 1.0;
+    double bU = 1.0;
+    double bD = 1.0;
 
     // Physical parameters for Sod
     const double x0 = 0.5;
@@ -175,7 +186,42 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 E[j][i] = rho[j][i]*(e + 0.5*u*u + 0.5*v*v);
             }
         }
+    } else if (xy == 4) {
+        double x0 = 0, y0 = 5, x1 = 10.0;
+        double p;
+        for (int j=2; j<jUpper; j++) {
+            for (int i=2; i<iUpper; i++) {
+                double r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x0, 2));
+                if (r <= 2.0) {
+                    rho[j][i] = 1.0;
+                    p = 1.0;
+                } else {
+                    rho[j][i] = 0.125;
+                    p = 0.1;
+                }
+
+                r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x1, 2));
+                if (r <= 2.0) rho[j][i] = 0.5;
+
+                double e = p/((gamma - 1.0)*rho[j][i]);
+                E[j][i] = e*rho[j][i];
+            }
+        }
+        // Set reflective boundaries top and bottom
+        bU = -1.0;
+        bD = -1.0;
     }
+
+    // Set boundary factor arrays
+    meshBoundaryLR = new double[2];
+    meshBoundaryUD = new double[2];
+
+    // Initialise all boundaries to be transmissive
+    meshBoundaryLR[0] = bL;
+    meshBoundaryLR[1] = bR;
+
+    meshBoundaryUD[0] = bD;
+    meshBoundaryUD[1] = bU;
 
     // Set boundary conditions
     setBoundaries();
@@ -195,10 +241,10 @@ void Mesh2D::setBoundaries() {
         momU[njGhosts-2][i] = momU[njGhosts-3][i];
         momU[njGhosts-1][i] = momU[njGhosts-4][i];
 
-        momV[1][i] = f*momV[2][i];
-        momV[0][i] = f*momV[3][i];
-        momV[njGhosts-2][i] = f*momV[njGhosts-3][i];
-        momV[njGhosts-1][i] = f*momV[njGhosts-4][i];
+        momV[1][i] = meshBoundaryUD[0]*momV[2][i];
+        momV[0][i] = meshBoundaryUD[0]*momV[3][i];
+        momV[njGhosts-2][i] = meshBoundaryUD[1]*momV[njGhosts-3][i];
+        momV[njGhosts-1][i] = meshBoundaryUD[1]*momV[njGhosts-4][i];
 
         E[1][i] = E[2][i];
         E[0][i] = E[3][i];
@@ -207,16 +253,16 @@ void Mesh2D::setBoundaries() {
     }
 
     for (int j=2; j<jUpper; j++) {
-        double f = -1.0;
+        double f = 1.0;
         rho[j][1] = rho[j][2];
         rho[j][0] = rho[j][3];
         rho[j][niGhosts-2] = rho[j][niGhosts-3];
         rho[j][niGhosts-1] = rho[j][niGhosts-4];
 
-        momU[j][1] = f*momU[j][2];
-        momU[j][0] = f*momU[j][3];
-        momU[j][niGhosts-2] = f*momU[j][niGhosts-3];
-        momU[j][niGhosts-1] = f*momU[j][niGhosts-4];
+        momU[j][1] = meshBoundaryLR[0]*momU[j][2];
+        momU[j][0] = meshBoundaryLR[0]*momU[j][3];
+        momU[j][niGhosts-2] = meshBoundaryLR[1]*momU[j][niGhosts-3];
+        momU[j][niGhosts-1] = meshBoundaryLR[1]*momU[j][niGhosts-4];
 
         momV[j][1] = momV[j][2];
         momV[j][0] = momV[j][3];
