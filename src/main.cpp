@@ -1,6 +1,6 @@
 #include "mesh2d.hpp"
 #include "update.hpp"
-#include "hydro_flux.hpp"
+#include "hydro.hpp"
 
 #include <iostream>
 #include "mpi.h"

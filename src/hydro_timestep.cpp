@@ -1,4 +1,4 @@
-#include "hydro_flux.hpp"
+#include "hydro.hpp"
 #include <math.h>
 
 double Hydro::getTimestep(Mesh2D mesh) {
