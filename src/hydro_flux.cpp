@@ -1,8 +1,8 @@
-#include "flux.hpp"
+#include "hydro_flux.hpp"
 #include <math.h>
 #include <iostream>
 
-Flux::Flux Flux::getFluxHLLC(
+Hydro::Flux Hydro::getFluxHLLC(
     double uL, double vL, double rhoL, double pL,
     double uR, double vR, double rhoR, double pR,
     double gamma) {

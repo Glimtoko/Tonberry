@@ -4,7 +4,7 @@
 #include "ncDim.h"
 #include "ncVar.h"
 
-#include <silo.h>
+#include "silo.h"
 
 #include <math.h>
 #include <string.h>
@@ -22,7 +22,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     }
 
     if (xy == 4) {
-        xLength = 30.0;
+        xLength = 40.0;
         yLength = 10.0;
     }
 
@@ -143,7 +143,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             }
         }
     } else if (xy == 4) {
-        double x0 = 0, y0 = 5, x1 = 10.0;
+        double x0 = 0, y0 = 5, x1 = 10.0, x2 = 20.0, y1 = 3.0, y2 = 7.0;
         double p;
         for (int j=2; j<jUpper; j++) {
             for (int i=2; i<iUpper; i++) {
@@ -159,15 +159,22 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x1, 2));
                 if (r <= 2.0) _LGET(rho, j, i) = 0.5;
 
+                r = sqrt(pow(y[j] - y1, 2) + pow(x[i] - x2, 2));
+                if (r <= 1.5) _LGET(rho, j, i) = 0.5;
+
+                r = sqrt(pow(y[j] - y2, 2) + pow(x[i] - x2, 2));
+                if (r <= 1.5) _LGET(rho, j, i) = 0.5;
+
                 double e = p/((gamma - 1.0)*_LGET(rho, j, i));
                 _LGET(E, j, i) = e*_LGET(rho, j, i);
                 _LGET(momU, j, i) = 0.0;
                 _LGET(momV, j, i) = 0.0;
             }
         }
-        // Set reflective boundaries top and bottom
+        // Set reflective boundaries top, bottom and right
         bU = -1.0;
         bD = -1.0;
+        bR = -1.0;
     }
 
     // Set boundary factor arrays
@@ -233,7 +240,7 @@ void Mesh2D::setBoundaries() {
 
 }
 
-void Mesh2D::dumpToSILO(double time) {
+void Mesh2D::dumpToSILO(double time, int step) {
     char stateNo[4];
     this->dumpStateNo++;
     sprintf(stateNo, "%03d", this->dumpStateNo);
@@ -274,24 +281,47 @@ void Mesh2D::dumpToSILO(double time) {
     coordnames[0] = strdup("X");
     coordnames[1] = strdup("Y");
 
-    // Write mesh to file
-    DBPutQuadmesh(file, "mesh1", coordnames, coordinates, nodeDims, 2, DB_DOUBLE, DB_COLLINEAR, NULL);
+    // Create option list
+    DBoptlist *optList = DBMakeOptlist(2);
+    DBAddOption(optList, DBOPT_DTIME, &time);
+    DBAddOption(optList, DBOPT_CYCLE, &step);
 
-    // Test writing a quant
+    // Write mesh to file
+    DBPutQuadmesh(file, "mesh1", coordnames, coordinates, nodeDims, 2, DB_DOUBLE, DB_COLLINEAR, optList);
+
+    // Set quant storage
     int cellDims[2] = {iSize, jSize};
     double *data = new double[cellDims[0]*cellDims[1]];
+
+
+    // Write density
     int index = 0;
     for (int j=2; j<this->jUpper; j++) {
         for (int i=2; i<this->iUpper; i++) {
             data[index++] = _PGET(this, rho, j, i);
         }
     }
+    DBPutQuadvar1(file, "Density", "mesh1", data, cellDims, 2, NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL);
 
-    DBPutQuadvar1(file, "Rho", "mesh1", data, cellDims, 2, NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL);
+    // Write pressure
+    index = 0;
+    for (int j=2; j<this->jUpper; j++) {
+        for (int i=2; i<this->iUpper; i++) {
+            double rho = _PGET(this, rho, j, i);
+            double u = _PGET(this, momU, j, i)/rho;
+            double v = _PGET(this, momV, j, i)/rho;
+            double p = (this->gamma - 1.0)*(_PGET(this, E, j, i) - 0.5*v*v - 0.5*u*u);
 
+            data[index++] = p;
+        }
+    }
+    DBPutQuadvar1(file, "Pressure", "mesh1", data, cellDims, 2, NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL);
 
     // Close file
     DBClose(file);
+
+    // Free storage
+    delete[] data;
 }
 
 double* &Mesh2D::getMomentum(Sweep sweep, Direction direction) {

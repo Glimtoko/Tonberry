@@ -39,7 +39,7 @@ public:
 
     void Kill();
     void setBoundaries();
-    void dumpToSILO(double);
+    void dumpToSILO(double, int);
 
     double* &getMomentum(Sweep, Direction);
 };
