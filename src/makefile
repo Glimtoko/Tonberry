@@ -15,6 +15,8 @@ HDF5_DIR := $(PROD)/hdf5_oldapi
 INC = -I$(SILO_DIR)/include -I$(HDF5_DIR)/include
 LIB = -L$(SILO_DIR)/lib -lsiloh5 -lnetcdf_c++4 -L$(HDF5_DIR)/lib -lhdf5 -Wl,-rpath $(PROD)/hdf5/lib
 
+VPATH=.:./hydro
+
 .PHONY: clean
 
 tonberry: $(OBJECTS)

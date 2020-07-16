@@ -3,6 +3,7 @@
 #include <math.h>
 #include <iostream>
 #include <cstdlib>
+#include <vector>
 
 double getLimiter1D(double di1, double di2, double omega);
 double getSlope1D(double* U, int i, double omega);

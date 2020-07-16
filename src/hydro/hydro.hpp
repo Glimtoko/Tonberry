@@ -1,7 +1,7 @@
 #ifndef FLUXH
 #define FLUXH
 
-#include "mesh2d.hpp"
+// #include "mesh2d.hpp"
 
 namespace Hydro {
     struct Flux {
@@ -22,7 +22,12 @@ namespace Hydro {
         int ni, int iUpper, double gamma, double dt, double dx
     );
 
-    double getTimestep(Mesh2D);
+    double getTimestep(
+        double *rho, double *momU, double *momV, double *E,
+        double dx, double dy,
+        int nCells,
+        double gamma, double cfl, double dtmax
+    );
 }
 
 #endif

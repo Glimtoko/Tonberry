@@ -1,5 +1,5 @@
 #include "update.hpp"
-#include "hydro.hpp"
+#include "hydro/hydro.hpp"
 
 #include <math.h>
 #include <iostream>

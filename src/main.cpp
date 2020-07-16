@@ -1,6 +1,6 @@
 #include "mesh2d.hpp"
 #include "update.hpp"
-#include "hydro.hpp"
+#include "hydro/hydro.hpp"
 
 #include <iostream>
 #include "mpi.h"
@@ -40,7 +40,13 @@ int main(int argc, char* argv[]) {
     for( ; ; ) {
         step++;
 
-        double dt = Hydro::getTimestep(mesh);
+        double dt = Hydro::getTimestep(
+            mesh.rho,  mesh.momU,  mesh.momV,  mesh.E,
+            mesh.dx, mesh.dy,
+            mesh.niGhosts*mesh.njGhosts,
+            mesh.gamma, mesh.cfl, mesh.dtmax
+        );
+
         dt = std::min(dt, outNext - t);
 
         MPI::COMM_WORLD.Bcast(&dt, 1, MPI::DOUBLE, 0);
