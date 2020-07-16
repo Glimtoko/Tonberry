@@ -324,24 +324,24 @@ void Mesh2D::dumpToSILO(double time, int step) {
     delete[] data;
 }
 
-double* &Mesh2D::getMomentum(Sweep sweep, Direction direction) {
-    switch (sweep) {
-        case Sweep::x:
-            switch (direction) {
-                case normal:
-                    return momU;
-                default:
-                    return momV;
-            }
-        default:
-            switch (direction) {
-                case normal:
-                    return momV;
-                default:
-                    return momU;
-            }
-    }
-}
+// double* &Mesh2D::getMomentum(Sweep sweep, Direction direction) {
+//     switch (sweep) {
+//         case Sweep::x:
+//             switch (direction) {
+//                 case normal:
+//                     return momU;
+//                 default:
+//                     return momV;
+//             }
+//         default:
+//             switch (direction) {
+//                 case normal:
+//                     return momV;
+//                 default:
+//                     return momU;
+//             }
+//     }
+// }
 
 void Mesh2D::Kill() {
     delete[] x;

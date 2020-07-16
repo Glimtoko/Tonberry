@@ -1,6 +1,6 @@
 #ifndef MESH2D_H
 #define MESH2D_H
-#include "sweep.hpp"
+// #include "sweep.hpp"/**/
 
 #include <vector>
 
@@ -41,6 +41,6 @@ public:
     void setBoundaries();
     void dumpToSILO(double, int);
 
-    double* &getMomentum(Sweep, Direction);
+//     double* &getMomentum(Sweep, Direction);
 };
 #endif
