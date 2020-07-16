@@ -1,5 +1,4 @@
 #include "mesh/mesh2d.hpp"
-#include "update.hpp"
 #include "hydro/hydro.hpp"
 
 #include <iostream>
@@ -58,9 +57,9 @@ int main(int argc, char* argv[]) {
         }
 
         // Sweep is half X, then Y, then half X
-        sweepX(mesh, dt/2.0);
-        sweepY(mesh, dt);
-        sweepX(mesh, dt/2.0);
+        mesh.sweepX(dt/2.0, Hydro::MUSCLHancock1D);
+        mesh.sweepY(dt, Hydro::MUSCLHancock1D);
+        mesh.sweepX(dt/2.0, Hydro::MUSCLHancock1D);
 
         t += dt;
         if (t >= outNext) {

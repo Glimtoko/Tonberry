@@ -18,7 +18,7 @@ namespace Hydro {
     );
 
     void MUSCLHancock1D(
-        double* &rho, double* &E, double* &momN, double* &momT,
+        double* rho, double* E, double* momN, double* momT,
         int ni, int iUpper, double gamma, double dt, double dx
     );
 

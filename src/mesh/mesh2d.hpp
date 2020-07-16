@@ -41,6 +41,14 @@ public:
     void setBoundaries();
     void dumpToSILO(double, int);
 
+    void sweepX(double dt,
+                void(*flux)(double*, double*, double*, double*, int, int, double, double, double)
+    );
+
+    void sweepY(double dt,
+                void(*flux)(double*, double*, double*, double*, int, int, double, double, double)
+    );
+
 //     double* &getMomentum(Sweep, Direction);
 };
 #endif

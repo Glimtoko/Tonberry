@@ -12,7 +12,7 @@ double calcFluxMom(double rho, double u, double v, double p);
 double calcFluxE(double u, double E, double p);
 
 void Hydro::MUSCLHancock1D(
-    double* &rho, double* &E, double* &momN, double* &momT,
+    double* rho, double* E, double* momN, double* momT,
     int ni, int iUpper, double gamma, double dt, double dx)
 {
     double omega = 0.0;

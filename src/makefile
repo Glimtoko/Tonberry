@@ -2,7 +2,7 @@ CC = mpic++
 #CFLAGS = -g -Wall -Wextra -ansi -pedantic -fsanitize=address -std=c++17
 CFLAGS = -O3 -std=c++17
 
-OBJECTS = main.o mesh2d.o hydro_flux.o hydro_timestep.o hydro_MH1D.o update.o
+OBJECTS = main.o mesh2d.o hydro_flux.o hydro_timestep.o hydro_MH1D.o
 
 # Installation directory
 INSTALL_DIR := /prod/Tonberry/bin/
@@ -32,9 +32,7 @@ install: tonberry
 	cp tonberry $(INSTALL_DIR)
 	chmod +x $(INSTALL_DIR)/tonberry
 
-main.o: mesh2d.o hydro_flux.o hydro_timestep.o hydro_MH1D.o update.o
-
-update.o: hydro_flux.o hydro_timestep.o hydro_MH1D.o
+main.o: mesh2d.o hydro_flux.o hydro_timestep.o hydro_MH1D.o
 
 
 %.o: %.cpp
