@@ -1,0 +1,1 @@
+target_sources(tonberry PRIVATE main.cpp)
