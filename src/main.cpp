@@ -2,7 +2,12 @@
 #include "hydro/hydro.hpp"
 
 #include <iostream>
+#include <memory>
+
 #include "mpi.h"
+
+#include "iris.hpp"
+#include "arcus.hpp"
 
 #include <fenv.h>
 
@@ -28,6 +33,17 @@ int main(int argc, char* argv[]) {
     // 100x100 mesh using spherical Sod set-up
     Mesh2D mesh(ni, nj, problem);
 
+    // Set logger registry
+    const int niG = ni + 2;
+    const int njG = nj + 2;
+    std::shared_ptr<iris::arcus::LogRegistry> log_reg(
+        iris::arcus::LogRegistry::Create(
+        mesh.regions, mesh.materials, ni*nj, ni*nj
+        )
+    );
+
+    log_reg->AddQuant("density", mesh.rho, iris::arcus::Centring::cell);
+
     if (myrank == 0) {
         mesh.dumpToSILO(0.0, 0);
     }
@@ -35,11 +51,24 @@ int main(int argc, char* argv[]) {
     double t = 0.0;
     double outNext = t + dtOut;
     int step = 0;
+    double dt;
+
+    log_reg->AddScalarDouble("t", &t);
+    log_reg->AddScalarDouble("dt", &dt);
+    // log_reg->AddScalarInt("step", &step);
+
+    std::unique_ptr<iris::Logger> myLogger(
+        new iris::Logger("BaseLogger", iris::Levels::Info)
+    );
+
+    myLogger->addConsoleAppender("%r [%t] %p@%c:: %m%n");
+    myLogger->log(iris::Levels::Info, "This is a test");
+    myLogger->setRegistry(log_reg);
 
     for( ; ; ) {
         step++;
 
-        double dt = Hydro::getTimestep(
+        dt = Hydro::getTimestep(
             mesh.rho,  mesh.momU,  mesh.momV,  mesh.E,
             mesh.dx, mesh.dy,
             mesh.niGhosts*mesh.njGhosts,
@@ -54,6 +83,8 @@ int main(int argc, char* argv[]) {
             std::cout << "Step: " << step;
             std::cout << ", time = " << t;
             std::cout << ", dt = " << dt << std::endl;
+
+            myLogger->logvar(iris::Levels::Info, "Time = @{t}, dt= @{dt}");
         }
 
         // Sweep is half X, then Y, then half X

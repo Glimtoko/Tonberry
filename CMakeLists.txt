@@ -16,13 +16,10 @@ add_subdirectory(src/hydro)
 
 find_package("NetCDF" REQUIRED)
 find_package("SILO" REQUIRED)
+find_package("Iris" REQUIRED)
+find_package("log4cxx" REQUIRED)
 
 target_link_libraries(tonberry netcdf)
 target_link_libraries(tonberry silo)
-
-
-# target_include_directories(iris PUBLIC
-#                           "${PROJECT_BINARY_DIR}"
-#                           "${PROJECT_SOURCE_DIR}/Iris/C++"
-#                           "${PROJECT_SOURCE_DIR}/Arcus/C++"
-#                           )
+target_link_libraries(tonberry iris)
+target_link_libraries(tonberry log4cxx)

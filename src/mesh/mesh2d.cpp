@@ -58,6 +58,10 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     momV = new double[njGhosts*niGhosts];
     E = new double[njGhosts*niGhosts];
 
+    // Set material and region arrays
+    materials = new int[njGhosts*niGhosts];
+    regions = new int[njGhosts*niGhosts];
+
     // Boundary values
     double bL = 1.0;
     double bR = 1.0;
@@ -84,11 +88,15 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             // E has a w**2 term, but it's always zero here... (actually, so is u...)
             double cellE = x[i] < x0 ? rhoL*(0.5*uL*uL + e) : rhoR*(0.5*uR*uR + e);
 
+            int regmat = x[i] < x0 ? 1 : 2;
+
             for (int j=2; j<jUpper; j++) {
                 _LGET(rho, j, i) = cellRho;
                 _LGET(momU, j, i) = cellMom;
                 _LGET(momV, j, i) = 0.0;
                 _LGET(E, j, i) = cellE;
+                _LGET(materials, j, i) = regmat;
+                _LGET(regions, j, i) = regmat;
             }
         }
     } else if (xy==1) {
@@ -98,11 +106,16 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             double e = y[j] < x0 ? pL/((gamma - 1.0)*rhoL) : pR/((gamma - 1.0)*rhoR);
             // E has a w**2 term, but it's always zero here... (actually, so is u...)
             double cellE = y[j] < x0 ? rhoL*(0.5*uL*uL + e) : rhoR*(0.5*uR*uR + e);
+
+            int regmat = x[j] < x0 ? 1 : 2;
+
             for (int i=2; i<iUpper; i++) {
                 _LGET(rho, j, i) = cellRho;
                 _LGET(momV, j, i) = cellMom;
                 _LGET(momU, j, i) = 0.0;
                 _LGET(E, j, i) = cellE;
+                _LGET(materials, j, i) = regmat;
+                _LGET(regions, j, i) = regmat;
             }
         }
     } else if (xy == 2) {
@@ -114,10 +127,14 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 double e = r < x0 ? pL/((gamma - 1.0)*rhoL) : pR/((gamma - 1.0)*rhoR);
                 double cellE = r < x0 ? rhoL*e : rhoR*e;
 
+                int regmat = r < x0 ? 1 : 2;
+
                 _LGET(rho, j, i) = cellRho;
                 _LGET(momV, j, i) = 0.0;
                 _LGET(momU, j, i) = 0.0;
                 _LGET(E, j, i) = cellE;
+                _LGET(materials, j, i) = regmat;
+                _LGET(regions, j, i) = regmat;
             }
         }
     } else if (xy == 3) {
@@ -141,6 +158,8 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 double p = _LGET(rho, j, i)*T;
                 double e = p/((gamma - 1)*_LGET(rho, j, i));
                 _LGET(E, j, i) = _LGET(rho, j, i)*(e + 0.5*u*u + 0.5*v*v);
+                _LGET(materials, j, i) = 1;
+                _LGET(regions, j, i) = 1;
             }
         }
     } else if (xy == 4) {
@@ -170,6 +189,8 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 _LGET(E, j, i) = e*_LGET(rho, j, i);
                 _LGET(momU, j, i) = 0.0;
                 _LGET(momV, j, i) = 0.0;
+                _LGET(materials, j, i) = 1;
+                _LGET(regions, j, i) = 1;
             }
         }
         // Set reflective boundaries top, bottom and right

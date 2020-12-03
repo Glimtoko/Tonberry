@@ -29,6 +29,9 @@ public:
     double* x;
     double* y;
 
+    int * materials;
+    int * regions;
+
     double* rho;
     double* momU;
     double* momV;
