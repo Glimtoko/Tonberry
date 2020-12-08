@@ -2,6 +2,7 @@
 #define MESH2D_H
 // #include "sweep.hpp"/**/
 
+#include "iris.hpp"
 #include <vector>
 
 #define GET(M, D, J, I) M.D[(J)*M.niGhosts + I]
@@ -15,6 +16,7 @@ public:
     int njGhosts;
     int iUpper;
     int jUpper;
+    int nreg;
 
     int dumpStateNo = 0;
 
@@ -42,7 +44,7 @@ public:
 
     void Kill();
     void setBoundaries();
-    void dumpToSILO(double, int);
+    void dumpToSILO(double, int, std::shared_ptr<iris::Logger>);
 
     void sweepX(double dt,
                 void(*flux)(double*, double*, double*, double*, int, int, double, double, double)

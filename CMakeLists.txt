@@ -14,6 +14,12 @@ add_subdirectory(src)
 add_subdirectory(src/mesh)
 add_subdirectory(src/hydro)
 
+# MPI
+find_package(MPI REQUIRED)
+include_directories(${MPI_INCLUDE_PATH})
+target_link_libraries(tonberry ${MPI_LIBRARIES})
+
+# Other required packages
 find_package("NetCDF" REQUIRED)
 find_package("SILO" REQUIRED)
 find_package("Iris" REQUIRED)
@@ -23,3 +29,8 @@ target_link_libraries(tonberry netcdf)
 target_link_libraries(tonberry silo)
 target_link_libraries(tonberry iris)
 target_link_libraries(tonberry log4cxx)
+
+# target_compile_options(tonberry PRIVATE "-fsanitize=address")
+# target_compile_options(tonberry PRIVATE "-g")
+# target_link_options(tonberry PRIVATE "-fsanitize=address")
+

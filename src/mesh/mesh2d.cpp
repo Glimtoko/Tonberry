@@ -33,6 +33,10 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     iUpper = ni + nghosts;
     jUpper = nj + nghosts;
 
+    std::cout << niGhosts << std::endl;
+    std::cout << njGhosts << std::endl;
+    std::cout << niGhosts*njGhosts << std::endl;
+
     // Set coordinate arrays. Since this is a cartesian mesh, these need only
     // be 1D arrays, as, for example, all cells with the same j-index will have
     // the same y position.
@@ -81,6 +85,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     cfl = 0.6;
 
     if (xy == 0) {
+        nreg = 2;
         for (int i=2; i<iUpper; i++) {
             double cellRho = x[i] < x0 ? rhoL : rhoR;
             double cellMom = x[i] < x0 ? rhoL * uL : rhoR * uR;
@@ -100,6 +105,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             }
         }
     } else if (xy==1) {
+        nreg = 2;
         for (int j=2; j<jUpper; j++) {
             double cellRho = y[j] < x0 ? rhoL : rhoR;
             double cellMom = y[j] < x0 ? rhoL * uL : rhoR * uR;
@@ -119,6 +125,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             }
         }
     } else if (xy == 2) {
+        nreg = 2;
         for (int j=2; j<jUpper; j++) {
             for (int i=2; i<iUpper; i++) {
                 double r = sqrt(y[j]*y[j] + x[i]*x[i]);
@@ -143,6 +150,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
         double x0 = 5, y0 = 5;
         double u0 = 1.0;
         double v0 = 0.0;
+        nreg = 1;
         for (int j=2; j<jUpper; j++) {
             for (int i=2; i<iUpper; i++) {
                 double r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x0, 2));
@@ -165,6 +173,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     } else if (xy == 4) {
         double x0 = 0, y0 = 5, x1 = 10.0, x2 = 20.0, y1 = 3.0, y2 = 7.0;
         double p;
+        nreg = 3;
         for (int j=2; j<jUpper; j++) {
             for (int i=2; i<iUpper; i++) {
                 double r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x0, 2));
@@ -190,7 +199,14 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
                 _LGET(momU, j, i) = 0.0;
                 _LGET(momV, j, i) = 0.0;
                 _LGET(materials, j, i) = 1;
-                _LGET(regions, j, i) = 1;
+
+                if (x[i] < x1) {
+                    _LGET(regions, j, i) = 1;
+                } else if (x[i] < x2) {
+                    _LGET(regions, j, i) = 2;
+                } else {
+                    _LGET(regions, j, i) = 3;
+                }
             }
         }
         // Set reflective boundaries top, bottom and right
@@ -262,7 +278,7 @@ void Mesh2D::setBoundaries() {
 
 }
 
-void Mesh2D::dumpToSILO(double time, int step) {
+void Mesh2D::dumpToSILO(double time, int step, std::shared_ptr<iris::Logger> logger) {
     char stateNo[4];
     this->dumpStateNo++;
     sprintf(stateNo, "%03d", this->dumpStateNo);
@@ -272,7 +288,7 @@ void Mesh2D::dumpToSILO(double time, int step) {
     strcat(fileName, stateNo);
     strcat(fileName, ".silo");
 
-    std::cout << "Outputting to " << fileName << std::endl;
+    logger->log(iris::Levels::Info, "Outputting to " + std::string(fileName));
 
     DBfile *file = NULL;
     file = DBCreate(fileName, DB_CLOBBER, DB_LOCAL, NULL, DB_PDB);
