@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
     const int problem = 4;
 
     const double dtOut = 1.0;
-    const double tEnd = 10.0;  // N.b. this *should* be 80+
+    const double tEnd = 1.0;  // N.b. this *should* be 80+
 
     // Initialise MPI
     MPI::Init(argc, argv);
@@ -42,6 +42,8 @@ int main(int argc, char* argv[]) {
         )
     );
 
+    log_reg->SetCellMap(mesh.cell_map);
+
     double t = 0.0;
     double outNext = t + dtOut;
     int step = 0;
@@ -60,20 +62,18 @@ int main(int argc, char* argv[]) {
         new iris::Logger("BaseLogger", iris::Levels::Info)
     );
 
-    coreLogger->addConsoleAppender("::CORE:: %m%n");
+    coreLogger->addConsoleAppender("%y %m%n");
     coreLogger->setRegistry(log_reg);
 
     std::shared_ptr<iris::Logger> spLogger(
         new iris::Logger("SPrintLogger", iris::Levels::Info)
     );
 
-    spLogger->addConsoleAppender("::SPRINT:: %m%n");
-    spLogger->addFileAppender("::SPRINT:: %m%n", "sprint.dat");
+    spLogger->addConsoleAppender(":S: %m%n");
+    spLogger->addFileAppender(":S: %m%n", "sprint.dat");
     spLogger->setRegistry(log_reg);
 
-    if (myrank == 0) {
-        mesh.dumpToSILO(0.0, 0, coreLogger);
-    }
+    mesh.dumpToSILO(0.0, 0, coreLogger);
 
     for( ; ; ) {
         step++;
@@ -89,8 +89,7 @@ int main(int argc, char* argv[]) {
 
         MPI::COMM_WORLD.Bcast(&dt, 1, MPI::DOUBLE, 0);
 
-        if (myrank == 0) 
-            coreLogger->logvar(iris::Levels::Info, "Step: @{step} :: Time = @{t}, dt = @{dt}");
+        coreLogger->logvar(iris::Levels::Info, "Step: @{step} :: Time = @{t}, dt = @{dt}");
 
         // Sweep is half X, then Y, then half X
         mesh.sweepX(dt/2.0, Hydro::MUSCLHancock1D);
@@ -102,24 +101,11 @@ int main(int argc, char* argv[]) {
             outNext += dtOut;
             if (myrank == 0) {
                 mesh.dumpToSILO(t, step, coreLogger);
-
-                spLogger->logvar(iris::Levels::Info, "");
-                spLogger->logvar(iris::Levels::Info, "Short Print at t = @{t}");
-                spLogger->logvar(iris::Levels::Info, "Region  Rho          momU         momV         E");
-                for (int r=0; r<mesh.nreg; r++) {
-                    spLogger->logvar(
-                        iris::Levels::Info,
-                        "@{regno}       @{density.region.n.sum}  @{momu.region.n.sum}  @{momv.region.n.sum}  @{e.region.n.sum}",
-                        r+1
-                    );
-                }
-                spLogger->logvar(iris::Levels::Info, "");
-                spLogger->logvar(
-                    iris::Levels::Info,
-                    "Total   @{density.sum}  @{momu.sum}  @{momv.sum}  @{e.sum}"
-                );
-                spLogger->logvar(iris::Levels::Info, "");
             }
+            spLogger->GenerateRegionalPrint(
+                iris::Levels::Info, 
+                "regno|Region density|Rho momu|momU momv|momV e|Energy"
+            );
         }
         if (t > tEnd || step > 10000) break;
     }

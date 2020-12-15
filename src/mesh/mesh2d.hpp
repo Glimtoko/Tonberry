@@ -33,6 +33,7 @@ public:
 
     int * materials;
     int * regions;
+    int * cell_map;
 
     double* rho;
     double* momU;

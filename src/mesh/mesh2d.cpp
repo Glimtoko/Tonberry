@@ -33,10 +33,6 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     iUpper = ni + nghosts;
     jUpper = nj + nghosts;
 
-    std::cout << niGhosts << std::endl;
-    std::cout << njGhosts << std::endl;
-    std::cout << niGhosts*njGhosts << std::endl;
-
     // Set coordinate arrays. Since this is a cartesian mesh, these need only
     // be 1D arrays, as, for example, all cells with the same j-index will have
     // the same y position.
@@ -65,6 +61,15 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
     // Set material and region arrays
     materials = new int[njGhosts*niGhosts];
     regions = new int[njGhosts*niGhosts];
+    
+    // Set initial cell map
+    cell_map = new int[njGhosts*niGhosts];
+    for (int i=0; i<niGhosts; i++) {
+        for (int j=0; j<njGhosts; j++) {
+            _LGET(cell_map, j, i) = 0;
+        }
+    }
+
 
     // Boundary values
     double bL = 1.0;
@@ -96,6 +101,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             int regmat = x[i] < x0 ? 1 : 2;
 
             for (int j=2; j<jUpper; j++) {
+                _LGET(cell_map, j, i) = 1;
                 _LGET(rho, j, i) = cellRho;
                 _LGET(momU, j, i) = cellMom;
                 _LGET(momV, j, i) = 0.0;
@@ -116,6 +122,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
             int regmat = x[j] < x0 ? 1 : 2;
 
             for (int i=2; i<iUpper; i++) {
+                _LGET(cell_map, j, i) = 1;
                 _LGET(rho, j, i) = cellRho;
                 _LGET(momV, j, i) = cellMom;
                 _LGET(momU, j, i) = 0.0;
@@ -128,6 +135,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
         nreg = 2;
         for (int j=2; j<jUpper; j++) {
             for (int i=2; i<iUpper; i++) {
+                _LGET(cell_map, j, i) = 1;
                 double r = sqrt(y[j]*y[j] + x[i]*x[i]);
                 double cellRho = r < x0 ? rhoL : rhoR;
 
@@ -153,6 +161,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
         nreg = 1;
         for (int j=2; j<jUpper; j++) {
             for (int i=2; i<iUpper; i++) {
+                _LGET(cell_map, j, i) = 1;
                 double r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x0, 2));
                 double f = B/(2*pi) * exp((1-r*r)/2);
                 double u = u0 + (x[i] - x0)*f;
@@ -176,6 +185,7 @@ Mesh2D::Mesh2D(int ni, int nj, int xy) {
         nreg = 3;
         for (int j=2; j<jUpper; j++) {
             for (int i=2; i<iUpper; i++) {
+                _LGET(cell_map, j, i) = 1;
                 double r = sqrt(pow(y[j] - y0, 2) + pow(x[i] - x0, 2));
                 if (r <= 2.0) {
                     _LGET(rho, j, i) = 1.0;
