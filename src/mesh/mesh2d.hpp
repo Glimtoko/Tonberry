@@ -45,7 +45,7 @@ public:
 
     void Kill();
     void setBoundaries();
-    void dumpToSILO(double, int, std::shared_ptr<iris::Logger>);
+    void dumpToSILO(double, int, iris::Logger*);
 
     void sweepX(double dt,
                 void(*flux)(double*, double*, double*, double*, int, int, double, double, double)

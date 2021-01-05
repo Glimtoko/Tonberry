@@ -288,7 +288,7 @@ void Mesh2D::setBoundaries() {
 
 }
 
-void Mesh2D::dumpToSILO(double time, int step, std::shared_ptr<iris::Logger> logger) {
+void Mesh2D::dumpToSILO(double time, int step, iris::Logger* logger) {
     char stateNo[4];
     this->dumpStateNo++;
     sprintf(stateNo, "%03d", this->dumpStateNo);

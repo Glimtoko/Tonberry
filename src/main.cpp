@@ -8,6 +8,8 @@
 
 #include "iris.hpp"
 #include "arcus.hpp"
+#include "arcus_c.h"
+#include "iris_c.h"
 
 #include <fenv.h>
 
@@ -42,6 +44,7 @@ int main(int argc, char* argv[]) {
         )
     );
 
+
     log_reg->SetCellMap(mesh.cell_map);
 
     double t = 0.0;
@@ -58,20 +61,45 @@ int main(int argc, char* argv[]) {
     log_reg->AddScalarDouble("dt", &dt);
     log_reg->AddScalarInt("step", &step);
 
-    std::shared_ptr<iris::Logger> coreLogger(
-        new iris::Logger("BaseLogger", iris::Levels::Info)
+    // ------------------------------------------------------------------------
+    // Test of C interface
+    arcus_reg_t c_reg = arcus_create_registry(
+         mesh.regions, mesh.materials, ni*nj, ni*nj
     );
 
-    coreLogger->addConsoleAppender("%y %m%n");
+    int status;
+    status = arcus_set_cell_map(c_reg, mesh.cell_map);
+    
+    char qname[] = "density";
+    status = arcus_add_quant(c_reg, qname, mesh.rho, ARCUS_CENTRE_CELL);
+
+    char iname[] = "t";
+    status = arcus_add_scalar_double(c_reg, iname, &t);
+
+    char lname[] = "clogger";
+    iris_log_t c_log = iris_create_logger(lname, IRIS_LEVEL_INFO);
+
+    status = iris_add_registry(c_log, c_reg);
+
+    char fmt[] = "%y %m%n";
+    status = iris_add_console_appender(c_log, fmt);
+
+
+    // ------------------------------------------------------------------------
+
+
+    iris::Logger * coreLogger = new iris::Logger("BaseLogger", iris::Levels::Info);
+
+    coreLogger->addConsoleAppender("C %m%n");
     coreLogger->setRegistry(log_reg);
+    // coreLogger->setMPIAll(false);
 
-    std::shared_ptr<iris::Logger> spLogger(
-        new iris::Logger("SPrintLogger", iris::Levels::Info)
-    );
+    iris::Logger * spLogger = new iris::Logger("SPrintLogger", iris::Levels::Info);
 
     spLogger->addConsoleAppender(":S: %m%n");
     spLogger->addFileAppender(":S: %m%n", "sprint.dat");
     spLogger->setRegistry(log_reg);
+    spLogger->setDefaultLevel(iris::Levels::Info);
 
     mesh.dumpToSILO(0.0, 0, coreLogger);
 
@@ -89,7 +117,10 @@ int main(int argc, char* argv[]) {
 
         MPI::COMM_WORLD.Bcast(&dt, 1, MPI::DOUBLE, 0);
 
-        coreLogger->logvar(iris::Levels::Info, "Step: @{step} :: Time = @{t}, dt = @{dt}");
+        coreLogger->logvar(iris::Levels::Info, "Step: @{step:%-5d} :: Time = @{t}, dt = @{dt:%e}");
+
+        char msg[] = "t = @{t:%e}";
+        status = iris_log(c_log, IRIS_LEVEL_INFO, msg);
 
         // Sweep is half X, then Y, then half X
         mesh.sweepX(dt/2.0, Hydro::MUSCLHancock1D);
@@ -103,8 +134,11 @@ int main(int argc, char* argv[]) {
                 mesh.dumpToSILO(t, step, coreLogger);
             }
             spLogger->GenerateRegionalPrint(
-                iris::Levels::Info, 
-                "regno|Region density|Rho momu|momU momv|momV e|Energy"
+                "regno|Region:%6d density|Rho momu|momU momv|momV e|Energy:%12.6e"
+            );
+
+            spLogger->GenerateMaterialPrint(
+                "matno|Material:%8d density|Rho momu|momU momv|momV e|Energy"
             );
         }
         if (t > tEnd || step > 10000) break;
